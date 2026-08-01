@@ -43,7 +43,9 @@
       nav a { display: block; padding: 9px 10px; border-radius: 8px; color: var(--muted); text-decoration: none; cursor: pointer; }
       nav a[aria-current="page"] { background: var(--raised); color: var(--text); }
       nav .navnote { margin-top: auto; color: var(--muted); font-size: 11.5px; padding: 10px; }
-      main { grid-area: main; padding: 26px 30px; overflow: auto; }
+      /* min-width so a long unbroken string inside can never widen the grid
+         column and hand the whole page a horizontal scrollbar. */
+      main { grid-area: main; padding: 26px 30px; overflow-y: auto; overflow-x: hidden; min-width: 0; }
 
       /* Activity is a drawer, not a destination: you want the log next to the
          thing that confused you, not instead of it. */
@@ -154,10 +156,16 @@
          irreversible thing this app does, so the decision gets its own surface
          that slides over everything rather than a column squeezed beside the
          list. */
-      .fwgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
-      @media (max-width: 980px) { .fwgrid { grid-template-columns: 1fr; } }
-      .fwgrid .card { margin-top: 0; display: flex; flex-direction: column; }
+      .fwgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+      @media (max-width: 1240px) { .fwgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+      @media (max-width: 820px) { .fwgrid { grid-template-columns: 1fr; } }
+      .fwgrid .card { margin-top: 0; display: flex; flex-direction: column; min-width: 0; }
       .fwgrid .card .tags { margin-top: auto; padding-top: 10px; }
+      /* Three across means less room per card; long names and source URLs have
+         to wrap rather than push the grid wider than the window. */
+      .fwgrid .card h3, .fwgrid .card .meta { overflow-wrap: anywhere; }
+      .fwgrid .cardhead { gap: 10px; }
+      .fwgrid .cardhead button { flex: none; }
 
       #scrim {
         position: fixed; inset: 54px 0 0 0; background: rgba(6,7,10,.55);
@@ -179,9 +187,14 @@
         display: flex; align-items: center; justify-content: space-between;
         padding: 16px 22px 12px; border-bottom: 1px solid var(--line);
       }
-      .drawerbody { flex: 1; overflow: auto; padding: 20px 22px; }
+      /* Nothing in here may be wider than the pane. A single unbroken manifest
+         URL was enough to put a horizontal scrollbar under the whole drawer. */
+      .drawerbody { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 18px 22px; min-width: 0; }
+      .drawerbody, .drawerbody * { overflow-wrap: anywhere; }
       .drawerbody h3 { margin: 0 0 4px; font-size: 17px; }
-      .drawerbody table { font-size: 12.5px; }
+      .drawerbody h2 { margin: 18px 0 2px; }
+      .drawerbody table { font-size: 12.5px; width: 100%; table-layout: fixed; }
+      .drawerbody .danger { margin-top: 16px; }
       /* Pinned, so the one irreversible action never scrolls out of reach. */
       .drawerfoot {
         border-top: 1px solid var(--line); padding: 16px 22px;
@@ -189,12 +202,13 @@
       }
       .drawerfoot button { min-width: 260px; padding: 12px 18px; }
       .drawerfoot .meta { text-align: center; }
+      .drawerfoot a, .drawerbody a { color: var(--accent); }
       .stepline { color: var(--muted); font-size: 11.5px; letter-spacing: .06em;
                   text-transform: uppercase; }
 
       .factrow {
         display: flex; justify-content: space-between; gap: 16px;
-        padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px;
+        padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13px;
       }
       .factrow span:first-child { color: var(--muted); }
       .factrow span:last-child { text-align: right; }
@@ -404,6 +418,21 @@
       const $ = (id) => document.getElementById(id);
       const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
       const kb = (n) => n >= 1048576 ? (n / 1048576).toFixed(2) + " MB" : (n / 1024).toFixed(0) + " kB";
+
+      // Sources are raw manifest URLs. Printed in full they are unreadable and
+      // wide enough to force a scrollbar; the whole thing stays in the tooltip.
+      function sourceLabel(s) {
+        try {
+          const u = new URL(s);
+          const parts = u.pathname.split("/").filter(Boolean);
+          const last = parts[parts.length - 1] || "";
+          const seg = /\.[a-z0-9]+$/i.test(last) ? parts[parts.length - 2] : last;
+          return u.hostname.replace(/^www\./, "") + (seg ? " / " + seg : "");
+        } catch (e) {
+          return s;
+        }
+      }
+      const sourceHtml = (s) => '<span title="' + esc(s) + '">' + esc(sourceLabel(s)) + "</span>";
 
       function log(line) {
         const el = $("log");
@@ -920,7 +949,7 @@
 
           return '<div class="card ' + (compatible ? "" : "dim") + '"><div class="cardhead"><div>' +
               "<h3>" + esc(e.name) + " " + esc(e.version) + (e.variant ? " · " + esc(e.variant) : "") + "</h3>" +
-              '<div class="meta">' + esc(e.source) + " · " + esc(e.provenance) + " · " + e.partCount + " part(s)</div>" +
+              '<div class="meta">' + sourceHtml(e.source) + " · " + esc(e.provenance) + " · " + e.partCount + " part(s)</div>" +
             '</div><button class="small' + (chosen ? " ghost" : "") + '" data-pick="' + esc(entryKey(e)) + '"' +
               (compatible ? "" : " disabled") + ">" + (chosen ? "Selected" : "Review") + "</button></div>" +
             (compatible ? "" : '<ul class="reasons">' + e.reasons.map((r) => "<li>" + esc(r) + "</li>").join("") + "</ul>") +
@@ -1030,7 +1059,7 @@
         if (state.phase === "preparing") {
           body.innerHTML =
             "<h3>" + esc(sel.entry.name) + " " + esc(sel.entry.version) + "</h3>" +
-            '<div class="meta">' + esc(sel.entry.source) + "</div>" +
+            '<div class="meta">' + sourceHtml(sel.entry.source) + "</div>" +
             '<div class="bar indeterminate"><div></div></div>' +
             '<div class="meta">Downloading every part and checking its SHA-256. Nothing is written yet.</div>' +
             '<div style="margin-top:22px">' +
@@ -1068,7 +1097,7 @@
 
         body.innerHTML =
           "<h3>" + esc(plan.name) + " " + esc(plan.version) + "</h3>" +
-          '<div class="meta">' + esc(sel.entry.source) +
+          '<div class="meta">' + sourceHtml(sel.entry.source) +
             (sel.entry.variant ? " · " + esc(sel.entry.variant) : "") + "</div>" +
 
           '<div style="margin-top:18px">' +
@@ -1084,11 +1113,11 @@
           "</div>" +
 
           "<h2>What gets written</h2>" +
-          '<p class="meta">Each file goes to a fixed address in flash. These offsets come from the publisher’s own manifest.</p>' +
+          '<p class="meta">Fixed addresses in flash, taken from the publisher’s own manifest.</p>' +
           "<table><thead><tr><th>At</th><th>Size</th><th>Integrity</th><th>Origin</th></tr></thead>" +
           "<tbody>" + rows + "</tbody></table>" +
 
-          '<div class="danger">Flashing overwrites everything already on the board, including anything saved to its filesystem. It cannot be undone, and the board must stay plugged in until it finishes.</div>';
+          '<div class="danger">This overwrites everything on the board, including its filesystem, and cannot be undone. Keep it plugged in until the write finishes.</div>';
 
         foot(flashButton());
         if ($("go")) $("go").addEventListener("click", runInstall);
