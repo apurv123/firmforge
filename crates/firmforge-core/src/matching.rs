@@ -12,11 +12,25 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "kind", content = "detail")]
 pub enum Incompatibility {
-    ChipFamily { required: String, found: String },
-    SerialType { required: String, found: String },
-    FlashTooSmall { required: u64, found: u64 },
+    ChipFamily {
+        required: String,
+        found: String,
+    },
+    SerialType {
+        required: String,
+        found: String,
+    },
+    FlashTooSmall {
+        required: u64,
+        found: u64,
+    },
     PsramRequired,
-    ChipRevisionTooOld { required: u32, found: u32 },
+    ChipRevisionTooOld {
+        required: u32,
+        found: u32,
+    },
+    /// The build publishes an over-the-air image only, with no serial parts.
+    OtaOnly,
 }
 
 impl Incompatibility {
@@ -37,6 +51,10 @@ impl Incompatibility {
             Incompatibility::PsramRequired => "requires PSRAM, which this device lacks".into(),
             Incompatibility::ChipRevisionTooOld { required, found } => {
                 format!("needs chip revision {required} or newer, yours is {found}")
+            }
+            Incompatibility::OtaOnly => {
+                "published as an over-the-air update only — there is nothing to write over USB"
+                    .into()
             }
         }
     }
@@ -61,6 +79,10 @@ impl Compatibility {
 /// Evaluate one build against one detected device.
 pub fn evaluate(build: &Build, device: &DeviceIdentity) -> Compatibility {
     let mut reasons = Vec::new();
+
+    if !build.is_flashable() {
+        reasons.push(Incompatibility::OtaOnly);
+    }
 
     if !build.chip_family.eq_ignore_ascii_case(&device.chip_family) {
         reasons.push(Incompatibility::ChipFamily {
@@ -101,6 +123,22 @@ pub fn evaluate(build: &Build, device: &DeviceIdentity) -> Compatibility {
     Compatibility {
         compatible: reasons.is_empty(),
         reasons,
+    }
+}
+
+/// What can be said about a build before any device is known.
+///
+/// Only device-independent facts are checked, so the catalogue is honest
+/// without a board plugged in: an OTA-only build is never installable over
+/// USB, whatever is connected.
+pub fn evaluate_without_device(build: &Build) -> Compatibility {
+    if build.is_flashable() {
+        Compatibility::ok()
+    } else {
+        Compatibility {
+            compatible: false,
+            reasons: vec![Incompatibility::OtaOnly],
+        }
     }
 }
 
@@ -175,6 +213,35 @@ mod tests {
         let builds = vec![build("ESP32-S3", None), build("ESP32-S3", Some("cdc"))];
         let chosen = select_best(&builds, &device()).unwrap();
         assert_eq!(chosen.serial_type.as_deref(), Some("cdc"));
+    }
+
+    /// ESPHome's real manifest contains an RP2040 entry with an `ota` object
+    /// and no `parts`. Rejecting it used to discard the whole file — including
+    /// the ESP32-S3 build that the default source list depends on.
+    #[test]
+    fn an_ota_only_build_is_listed_but_not_installable() {
+        let build = Build {
+            chip_family: "RP2040".into(),
+            serial_type: None,
+            parts: vec![],
+            variant: None,
+            variant_omits: vec![],
+            capabilities: vec![],
+            assets: vec![],
+            board_ids: vec![],
+            constraints: Constraints::default(),
+            ota_protocol: None,
+        };
+        assert!(!build.is_flashable());
+
+        let c = evaluate_without_device(&build);
+        assert!(!c.compatible, "nothing to write means nothing to install");
+        assert!(c.reasons[0].message().contains("over-the-air"));
+    }
+
+    #[test]
+    fn a_normal_build_needs_no_device_to_look_installable() {
+        assert!(evaluate_without_device(&build("ESP32-S3", None)).compatible);
     }
 
     #[test]

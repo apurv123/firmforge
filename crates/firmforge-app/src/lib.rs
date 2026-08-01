@@ -97,7 +97,7 @@ fn entry_for(
 ) -> CatalogueEntry {
     let compatibility = match device {
         Some(d) => matching::evaluate(build, d),
-        None => Compatibility::ok(),
+        None => matching::evaluate_without_device(build),
     };
     let reasons = compatibility.reasons.iter().map(|r| r.message()).collect();
 

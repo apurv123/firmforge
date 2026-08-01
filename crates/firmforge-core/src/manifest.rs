@@ -87,6 +87,12 @@ pub struct Build {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub serial_type: Option<String>,
 
+    /// Absent on OTA-only builds. ESPHome's published manifest has one — its
+    /// RP2040 entry carries an `ota` object and no `parts` — and refusing to
+    /// parse it would have thrown away the other six builds in the same file,
+    /// including the ESP32-S3 one. A build with no parts cannot be flashed over
+    /// serial, and `is_flashable` is how the rest of the app knows that.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parts: Vec<Part>,
 
     // ---- firmforge extensions ----
@@ -116,6 +122,13 @@ pub struct Build {
     /// Determines which transports the app may offer (the only path on iOS).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ota_protocol: Option<String>,
+}
+
+impl Build {
+    /// Whether this build can be written over a serial connection at all.
+    pub fn is_flashable(&self) -> bool {
+        !self.parts.is_empty()
+    }
 }
 
 /// A parsed manifest describing one firmware release.
@@ -185,7 +198,6 @@ impl Manifest {
 fn unknown_name() -> String {
     "Unnamed firmware".to_string()
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -231,6 +243,46 @@ mod tests {
         assert!(m.builds[2].serial_type.is_none());
         // Extensions default cleanly when absent.
         assert_eq!(m.channel, Channel::Stable);
+    }
+
+    /// A verbatim excerpt of ESPHome's live manifest, which is one of the
+    /// sources firmforge ships with. Two traps in one file: an OTA-only build
+    /// with no `parts`, and none of firmforge's own extension fields.
+    const ESPHOME_LIVE: &str = r#"{
+      "name": "esphome.web",
+      "version": "26.5.1",
+      "builds": [
+        { "chipFamily": "ESP32-S3",
+          "ota": { "path": "x.ota.bin", "md5": "d", "summary": "s" },
+          "parts": [ { "path": "esphome-web-esp32s3.factory.bin", "offset": 0 } ] },
+        { "chipFamily": "RP2040",
+          "ota": { "path": "y.ota.bin", "md5": "d", "release_url": "https://example.invalid" } }
+      ]
+    }"#;
+
+    #[test]
+    fn parses_the_real_esphome_manifest_including_its_ota_only_build() {
+        let m = Manifest::from_json(ESPHOME_LIVE.as_bytes())
+            .expect("one odd build must not cost the whole source");
+        assert_eq!(m.builds.len(), 2);
+        assert!(m.builds[0].is_flashable());
+        assert!(!m.builds[1].is_flashable(), "RP2040 entry has no parts");
+    }
+
+    /// Tasmota's published manifest has no `version` field at all.
+    #[test]
+    fn a_manifest_with_no_version_still_parses_and_renders() {
+        let m = Manifest::from_json(
+            br#"{ "name": "Tasmota", "builds": [ { "chipFamily": "ESP32-S3", "parts": [] } ] }"#,
+        )
+        .expect("must parse");
+        assert_eq!(m.display_version(), "unversioned");
+    }
+
+    #[test]
+    fn a_manifest_with_no_name_falls_back_rather_than_failing() {
+        let m = Manifest::from_json(br#"{ "builds": [] }"#).expect("must parse");
+        assert_eq!(m.name, "Unnamed firmware");
     }
 
     #[test]
