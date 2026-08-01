@@ -1,46 +1,90 @@
 {
-  "name": "firmforge Example Firmware",
-  "version": "0.1.0",
+  "name": "ESP32 Marauder",
+  "version": "v1.14.1",
   "channel": "stable",
-  "funding_url": "https://github.com/apurv123/firmforge",
-  "releaseNotesUrl": "https://github.com/apurv123/firmforge/blob/main/firmware/CHANGELOG.md",
+  "releaseNotesUrl": "https://github.com/justcallmekoko/ESP32Marauder/releases/tag/v1.14.1",
+  "funding_url": "https://github.com/sponsors/justcallmekoko",
+
+  "_comment": [
+    "A worked, working example of the firmforge repository convention.",
+    "",
+    "Every part below points at ESP32 Marauder's own GitHub release assets rather",
+    "than a copy stored here. That is deliberate: referencing upstream means no",
+    "redistribution takes place, so no licence obligation is inherited, and the",
+    "SHA-256 values become a genuine integrity check on someone else's artifact",
+    "instead of a checksum of our own copy. See plan/spec/legal-and-licensing.md.",
+    "",
+    "Offsets, sizes and digests are copied verbatim from Marauder's authoritative",
+    "installer manifest (firmware-manifest.json, v1.14.1, commit 43aa8bc1), which",
+    "is generated from Arduino CLI's real upload recipe rather than guessed.",
+    "",
+    "Marauder is MIT licensed. It is offensive-security tooling: use it only on",
+    "networks you own or are authorised to test."
+  ],
+
   "builds": [
     {
       "chipFamily": "ESP32-S3",
       "serialType": "cdc",
-      "boardIds": ["m5stack-cardputer", "lilygo-t-deck"],
-      "capabilities": ["wifi", "ble", "ir"],
+      "variant": "M5 Cardputer",
+      "boardIds": ["m5stack-cardputer"],
+      "capabilities": ["wifi", "ble"],
       "constraints": {
         "minFlashSize": 8388608
       },
-      "otaProtocol": "ble-nus",
       "parts": [
-        { "path": "builds/0.1.0/esp32s3/bootloader.bin", "offset": 4096, "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
-        { "path": "builds/0.1.0/esp32s3/partitions.bin", "offset": 32768, "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
-        { "path": "builds/0.1.0/esp32s3/boot_app0.bin", "offset": 57344, "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
-        { "path": "builds/0.1.0/esp32s3/app.bin", "offset": 65536, "sha256": "0000000000000000000000000000000000000000000000000000000000000000" }
-      ],
-      "assets": [
-        { "path": "builds/0.1.0/assets/default-theme.bin", "target": "/firmforge/themes/default.bin", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" }
+        {
+          "path": "https://github.com/justcallmekoko/ESP32Marauder/releases/download/v1.14.1/esp32_marauder_installer_v1_14_1_20260801_m5cardputer.bootloader.bin",
+          "offset": 0,
+          "sha256": "498031444695367d9af10f75f7c8c060e2237c39879eac287223dd4b4c1077fe"
+        },
+        {
+          "path": "https://github.com/justcallmekoko/ESP32Marauder/releases/download/v1.14.1/esp32_marauder_installer_v1_14_1_20260801_m5cardputer.partition-table.bin",
+          "offset": 32768,
+          "sha256": "1d9cca96de0fe07ad7fc0648b9878ddecd9ce565e38b589ad20fea698ed4c80c"
+        },
+        {
+          "path": "https://github.com/justcallmekoko/ESP32Marauder/releases/download/v1.14.1/esp32_marauder_installer_v1_14_1_20260801_m5cardputer.ota-data.bin",
+          "offset": 57344,
+          "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+        },
+        {
+          "path": "https://github.com/justcallmekoko/ESP32Marauder/releases/download/v1.14.1/esp32_marauder_installer_v1_14_1_20260801_m5cardputer.bin",
+          "offset": 65536,
+          "sha256": "4dff5a88322f8f6f4935bdfe8b08ff939385173b4666d614620a8dc679970f60"
+        }
       ]
     },
     {
-      "chipFamily": "ESP32-S3",
+      "chipFamily": "ESP32",
       "serialType": "uart",
-      "variant": "LITE_VERSION",
-      "variantOmits": ["ssh", "wireguard", "interpreter"],
+      "variant": "CYD 2432S024 (Guition)",
+      "boardIds": ["cyd-2432s024-guition"],
       "capabilities": ["wifi", "ble"],
+      "constraints": {
+        "minFlashSize": 4194304
+      },
       "parts": [
-        { "path": "builds/0.1.0/esp32s3-uart/bootloader.bin", "offset": 4096 },
-        { "path": "builds/0.1.0/esp32s3-uart/app.bin", "offset": 65536 }
-      ]
-    },
-    {
-      "chipFamily": "ESP32-C3",
-      "capabilities": ["wifi", "ble"],
-      "parts": [
-        { "path": "builds/0.1.0/esp32c3/bootloader.bin", "offset": 0 },
-        { "path": "builds/0.1.0/esp32c3/app.bin", "offset": 65536 }
+        {
+          "path": "https://github.com/justcallmekoko/ESP32Marauder/releases/download/v1.14.1/esp32_marauder_installer_v1_14_1_20260801_cyd_2432S024_guition.bootloader.bin",
+          "offset": 4096,
+          "sha256": "0fdc7cfec9ebdeabc63484b2569488f60b2100f34b01db323b03372132b0f5f1"
+        },
+        {
+          "path": "https://github.com/justcallmekoko/ESP32Marauder/releases/download/v1.14.1/esp32_marauder_installer_v1_14_1_20260801_cyd_2432S024_guition.partition-table.bin",
+          "offset": 32768,
+          "sha256": "0a8b5720e7b77ff11f1462458c3a509dee79224e5279898f26d6a2e3ae0517b7"
+        },
+        {
+          "path": "https://github.com/justcallmekoko/ESP32Marauder/releases/download/v1.14.1/esp32_marauder_installer_v1_14_1_20260801_cyd_2432S024_guition.ota-data.bin",
+          "offset": 57344,
+          "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+        },
+        {
+          "path": "https://github.com/justcallmekoko/ESP32Marauder/releases/download/v1.14.1/esp32_marauder_installer_v1_14_1_20260801_cyd_2432S024_guition.bin",
+          "offset": 65536,
+          "sha256": "7bc75f5873b58512efb086f6d69eedb3cf14c480430b9065118f83b8c52b0c6b"
+        }
       ]
     }
   ]

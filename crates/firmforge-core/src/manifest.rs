@@ -24,8 +24,16 @@ pub enum Channel {
 /// One flashable part: a binary written at an absolute flash offset.
 ///
 /// Firmware is explicitly multi-part. Note that the bootloader offset differs
-/// by chip family (`0x0` on C3/C6/H2 versus `0x1000` on ESP32/S2/S3), which is
-/// the single most common cause of hand-rolled `esptool` failures.
+/// by chip family — `0x0` on ESP32-S3/C3/C6/H2 but `0x1000` on the original
+/// ESP32 and the S2 — which is the single most common cause of hand-rolled
+/// `esptool` failures.
+///
+/// `path` follows ESP Web Tools semantics: relative to the manifest's own URL.
+/// It may also be an absolute `https://` URL, which is how firmforge points at
+/// an upstream project's release asset **without rehosting the binary** — see
+/// `plan/spec/legal-and-licensing.md` §2. Rehosting a GPL/AGPL build makes the
+/// host a distributor with a corresponding-source obligation; referencing does
+/// not.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Part {
     pub path: String,
@@ -33,6 +41,11 @@ pub struct Part {
     /// firmforge extension: lowercase hex SHA-256 of the part.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sha256: Option<String>,
+    /// firmforge extension: explicit absolute URL, overriding `path` resolution.
+    /// Preferred when the manifest lives in one repository and the binary is
+    /// published in another.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
 }
 
 /// A non-binary payload shipped with a build (SD card / LittleFS assets).
@@ -203,6 +216,7 @@ mod tests {
                     path: "app.bin".into(),
                     offset: 0x10000,
                     sha256: Some("ab".repeat(32)),
+                    url: None,
                 }],
                 variant: Some("LITE_VERSION".into()),
                 variant_omits: vec!["ssh".into(), "wireguard".into(), "interpreter".into()],

@@ -141,6 +141,7 @@ mod tests {
                 path: "app.bin".into(),
                 offset: 0x10000,
                 sha256: None,
+                url: None,
             }],
             variant: None,
             variant_omits: vec![],

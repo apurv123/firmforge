@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "identifier": "com.firmforge.app",
   "build": {
-    "frontendDist": "../../../ui/dist"
+    "frontendDist": "../../../ui/dist",
+    "withGlobalTauri": true
   },
   "app": {
     "windows": [

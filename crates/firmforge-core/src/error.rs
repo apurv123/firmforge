@@ -17,6 +17,15 @@ pub enum Error {
 
     #[error("io error: {0}")]
     Io(String),
+
+    #[error("invalid url: {0}")]
+    InvalidUrl(String),
+
+    #[error("network error: {0}")]
+    Network(String),
+
+    #[error("no firmware manifest found in {0}")]
+    NoManifest(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

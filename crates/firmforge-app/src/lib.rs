@@ -5,12 +5,20 @@
 //! this crate free of `tauri` also means it can back a headless CLI (spec
 //! F-32) without change.
 
+pub mod flash;
+pub mod github;
+pub mod install;
+
 use firmforge_core::{
     device::DeviceIdentity,
     manifest::{Build, Manifest},
     matching::{self, Compatibility},
 };
 use serde::{Deserialize, Serialize};
+
+pub use flash::{demo_target, FlashEvent, Target};
+pub use github::{discover, DiscoveredManifest, Source};
+pub use install::{prepare, PartSummary, Prepared};
 
 /// A catalogue entry as rendered on a firmforge card (spec screen D3).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,6 +33,21 @@ pub struct CatalogueEntry {
     /// Plain-language reasons shown on a dimmed card. Never hide the card.
     pub reasons: Vec<String>,
     pub verified: bool,
+
+    // ---- provenance and addressing, so a card can be acted on ----
+    /// `owner/repo` this came from, empty for a hand-pasted manifest.
+    #[serde(default)]
+    pub source: String,
+    /// Where the manifest was fetched from; the base for relative part paths.
+    #[serde(default)]
+    pub manifest_url: String,
+    /// e.g. `main branch` or `release v1.16`.
+    #[serde(default)]
+    pub provenance: String,
+    /// Index into `manifest.builds`, so the shell can name this exact build.
+    pub build_index: usize,
+    pub chip_family: String,
+    pub part_count: usize,
 }
 
 /// Parse a manifest and evaluate every build against a detected device.
@@ -38,13 +61,36 @@ pub fn build_catalogue(
     manifest
         .builds
         .iter()
-        .map(|build| entry_for(manifest, build, device))
+        .enumerate()
+        .map(|(index, build)| entry_for(manifest, build, index, device))
+        .collect()
+}
+
+/// Build catalogue entries for everything discovered in a repository, carrying
+/// the provenance needed to download and flash each one.
+pub fn catalogue_from_sources(
+    discovered: &[DiscoveredManifest],
+    device: Option<&DeviceIdentity>,
+) -> Vec<CatalogueEntry> {
+    discovered
+        .iter()
+        .flat_map(|found| {
+            build_catalogue(&found.manifest, device)
+                .into_iter()
+                .map(move |mut entry| {
+                    entry.source = found.source.clone();
+                    entry.manifest_url = found.manifest_url.clone();
+                    entry.provenance = found.provenance.clone();
+                    entry
+                })
+        })
         .collect()
 }
 
 fn entry_for(
     manifest: &Manifest,
     build: &Build,
+    build_index: usize,
     device: Option<&DeviceIdentity>,
 ) -> CatalogueEntry {
     let compatibility = match device {
@@ -65,6 +111,12 @@ fn entry_for(
         compatibility,
         reasons,
         verified: manifest.signature.is_some(),
+        source: String::new(),
+        manifest_url: String::new(),
+        provenance: String::new(),
+        build_index,
+        chip_family: build.chip_family.clone(),
+        part_count: build.parts.len(),
     }
 }
 

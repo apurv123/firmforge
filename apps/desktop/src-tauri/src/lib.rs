@@ -1,14 +1,44 @@
 //! firmforge desktop shell.
 //!
 //! Deliberately thin: every command delegates to `firmforge-app`, which is
-//! shared verbatim with the mobile shell.
+//! shared verbatim with the mobile shell. The only logic that belongs here is
+//! turning results into something the webview can consume, and forwarding
+//! flash progress as Tauri events so the UI updates during a write rather than
+//! after it.
 
-use firmforge_app::{build_catalogue, parse_manifest, CatalogueEntry};
+use firmforge_app::{
+    build_catalogue, catalogue_from_sources, flash, install, parse_manifest, CatalogueEntry,
+    DiscoveredManifest, Source, Target,
+};
 use firmforge_core::device::DeviceIdentity;
+use serde::Serialize;
+use tauri::{AppHandle, Emitter};
+
+/// Everything the user needs to see before confirming an install.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct InstallPlan {
+    name: String,
+    version: String,
+    chip_family: String,
+    total_bytes: usize,
+    parts: Vec<install::PartSummary>,
+    /// True when every part carried a checksum that matched.
+    fully_verified: bool,
+    /// True when no part is served from the manifest's own repository.
+    all_upstream: bool,
+}
 
 #[tauri::command]
 fn list_ports() -> Result<serde_json::Value, String> {
     serde_json::to_value(firmforge_app::list_serial_ports()).map_err(|e| e.to_string())
+}
+
+/// The simulated device, so the whole workflow can be exercised without
+/// hardware and without writing to anything.
+#[tauri::command]
+fn demo_device() -> Target {
+    flash::demo_target()
 }
 
 #[tauri::command]
@@ -20,10 +50,112 @@ fn catalogue(
     Ok(build_catalogue(&manifest, device.as_ref()))
 }
 
+/// Add a GitHub repository and read every firmware manifest it publishes.
+#[tauri::command]
+async fn add_source(repo: String) -> Result<Vec<DiscoveredManifest>, String> {
+    let source = Source::parse(&repo).map_err(|e| e.to_string())?;
+    firmforge_app::discover(&source)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Turn discovered manifests into catalogue cards for a given device.
+#[tauri::command]
+fn catalogue_for(
+    discovered: Vec<DiscoveredManifest>,
+    device: Option<DeviceIdentity>,
+) -> Vec<CatalogueEntry> {
+    catalogue_from_sources(&discovered, device.as_ref())
+}
+
+/// Download and verify a build without writing anything, returning the plan the
+/// user confirms. Failing here is safe; failing after a write has begun is not.
+#[tauri::command]
+async fn prepare_install(
+    discovered: DiscoveredManifest,
+    build_index: usize,
+) -> Result<InstallPlan, String> {
+    let build = discovered
+        .manifest
+        .builds
+        .get(build_index)
+        .ok_or_else(|| format!("build {build_index} is not in this manifest"))?;
+
+    let prepared = install::prepare(build, &discovered.manifest_url)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(InstallPlan {
+        name: discovered.manifest.name.clone(),
+        version: discovered.manifest.version.clone(),
+        chip_family: build.chip_family.clone(),
+        total_bytes: prepared.total_bytes(),
+        fully_verified: !prepared.summaries.is_empty()
+            && prepared.summaries.iter().all(|p| p.verified),
+        all_upstream: prepared.summaries.iter().all(|p| p.upstream),
+        parts: prepared.summaries,
+    })
+}
+
+/// Run the install. Progress arrives on the `flash` event channel.
+///
+/// `demo` writes nothing; it re-downloads, re-verifies and simulates the write
+/// so a manifest can be rehearsed end to end before real hardware is risked.
+#[tauri::command]
+async fn run_install(
+    app: AppHandle,
+    discovered: DiscoveredManifest,
+    build_index: usize,
+    demo: bool,
+) -> Result<(), String> {
+    let emit = {
+        let app = app.clone();
+        move |event: flash::FlashEvent| {
+            let _ = app.emit("flash", event);
+        }
+    };
+
+    if !demo {
+        let message =
+            "Writing to real hardware is not implemented yet — use the demo device.".to_string();
+        emit(flash::FlashEvent::Failed {
+            message: message.clone(),
+        });
+        return Err(message);
+    }
+
+    let build = discovered
+        .manifest
+        .builds
+        .get(build_index)
+        .ok_or_else(|| format!("build {build_index} is not in this manifest"))?;
+
+    let prepared = match install::prepare(build, &discovered.manifest_url).await {
+        Ok(p) => p,
+        Err(e) => {
+            emit(flash::FlashEvent::Failed {
+                message: e.to_string(),
+            });
+            return Err(e.to_string());
+        }
+    };
+
+    flash::run_demo(&prepared, emit).await;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![list_ports, catalogue])
+        .invoke_handler(tauri::generate_handler![
+            list_ports,
+            demo_device,
+            catalogue,
+            catalogue_for,
+            add_source,
+            prepare_install,
+            run_install
+        ])
         .run(tauri::generate_context!())
         .expect("error while running firmforge");
 }

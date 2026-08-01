@@ -6,87 +6,410 @@
     <title>firmforge</title>
     <style>
       :root {
-        --bg: #0d0f14; --panel: #151922; --line: #232936;
-        --text: #e6e9ef; --muted: #8b94a7; --accent: #7c5cff; --ok: #3ecf8e;
+        --bg: #0d0f14; --panel: #151922; --line: #232936; --raised: #1e2431;
+        --text: #e6e9ef; --muted: #8b94a7; --accent: #7c5cff;
+        --ok: #3ecf8e; --warn: #f2b544; --bad: #f2555a;
       }
       * { box-sizing: border-box; }
       body {
         margin: 0; background: var(--bg); color: var(--text);
         font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-        display: grid; grid-template-columns: 220px 1fr; height: 100vh;
+        display: grid; grid-template-columns: 230px 1fr; height: 100vh;
       }
       nav { background: var(--panel); border-right: 1px solid var(--line); padding: 18px 12px; display: flex; flex-direction: column; }
       .brand { font-weight: 700; letter-spacing: .04em; padding: 4px 10px 18px; }
       .brand span { color: var(--accent); }
-      nav a { display: block; padding: 9px 10px; border-radius: 8px; color: var(--muted); text-decoration: none; }
-      nav a[aria-current="page"] { background: #1e2431; color: var(--text); }
+      nav a { display: block; padding: 9px 10px; border-radius: 8px; color: var(--muted); text-decoration: none; cursor: pointer; }
+      nav a[aria-current="page"] { background: var(--raised); color: var(--text); }
       .device-chip { margin-top: auto; border: 1px solid var(--line); border-radius: 10px; padding: 10px; color: var(--muted); font-size: 12px; }
-      main { padding: 28px 32px; overflow: auto; }
+      .device-chip b { color: var(--text); font-weight: 600; }
+      main { padding: 26px 30px; overflow: auto; }
       h1 { font-size: 20px; margin: 0 0 4px; }
-      p.sub { color: var(--muted); margin: 0 0 24px; }
-      .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-      .step { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
-      .step[data-state="pending"] { opacity: .45; }
-      .step h2 { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
-      button { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 9px 14px; font: inherit; cursor: pointer; }
+      p.sub { color: var(--muted); margin: 0 0 22px; }
+      section[hidden] { display: none; }
+
+      .row { display: flex; gap: 10px; align-items: center; }
+      input[type=text] {
+        flex: 1; background: #0a0c11; border: 1px solid var(--line); color: var(--text);
+        border-radius: 8px; padding: 10px 12px; font: inherit;
+      }
+      input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+      button {
+        background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+        padding: 10px 15px; font: inherit; cursor: pointer;
+      }
+      button.ghost { background: var(--raised); color: var(--text); }
+      button.small { padding: 6px 10px; font-size: 12px; }
       button:disabled { background: #2a3040; color: var(--muted); cursor: not-allowed; }
-      .hint { color: var(--muted); font-size: 12px; margin-top: 10px; }
-      pre { background: #0a0c11; border: 1px solid var(--line); border-radius: 10px; padding: 12px; color: var(--muted); overflow: auto; margin-top: 24px; }
-      .ok { color: var(--ok); }
+
+      .card {
+        background: var(--panel); border: 1px solid var(--line);
+        border-radius: 12px; padding: 16px; margin-top: 14px;
+      }
+      .card.dim { opacity: .55; }
+      .card h3 { margin: 0 0 2px; font-size: 15px; }
+      .meta { color: var(--muted); font-size: 12px; }
+      .cardhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+      .tags { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+      .tag {
+        font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
+        border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; color: var(--muted);
+      }
+      .tag.ok { color: var(--ok); border-color: #1d4535; }
+      .tag.warn { color: var(--warn); border-color: #4a3a17; }
+      .reasons { margin: 10px 0 0; padding-left: 18px; color: var(--warn); font-size: 12.5px; }
+
+      pre {
+        background: #0a0c11; border: 1px solid var(--line); border-radius: 10px;
+        padding: 12px; color: var(--muted); overflow: auto; margin-top: 14px;
+        font-size: 12.5px; max-height: 60vh; white-space: pre-wrap; word-break: break-word;
+      }
+      .bar { height: 8px; background: #0a0c11; border-radius: 999px; overflow: hidden; margin: 16px 0 6px; }
+      .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .18s linear; }
+      table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+      th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { color: var(--muted); font-weight: 500; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; }
+      td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+      td.url { word-break: break-all; max-width: 320px; }
+      .banner { border-radius: 10px; padding: 11px 13px; font-size: 13px; margin-bottom: 16px; }
+      .banner.info { background: #16203a; border: 1px solid #24406e; }
+      .banner.bad { background: #2a1416; border: 1px solid #5a2226; color: #ffc9cc; }
+      .empty { color: var(--muted); border: 1px dashed var(--line); border-radius: 12px; padding: 26px; text-align: center; margin-top: 14px; }
+      code { background: #0a0c11; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
     </style>
   </head>
   <body>
     <nav>
       <div class="brand">firm<span>forge</span></div>
-      <a href="#" aria-current="page">Library</a>
-      <a href="#">Catalogue</a>
-      <a href="#">Sources</a>
-      <a href="#">Console</a>
-      <a href="#">Settings</a>
-      <div class="device-chip" id="chip">No device connected</div>
+      <a data-screen="sources" aria-current="page">Sources</a>
+      <a data-screen="catalogue">Catalogue</a>
+      <a data-screen="device">Device</a>
+      <a data-screen="install">Install</a>
+      <a data-screen="console">Console</a>
+      <div class="device-chip" id="chip">No device selected</div>
     </nav>
 
     <main>
-      <h1>Connect a device</h1>
-      <p class="sub">Plug in an ESP32 board over USB to begin.</p>
+      <section id="screen-sources">
+        <h1>Firmware sources</h1>
+        <p class="sub">Add a GitHub repository. firmforge reads <code>firmware/manifest.json</code> from its default branch, and any <code>manifest.json</code> attached to its releases.</p>
 
-      <section class="steps">
-        <div class="step" data-state="ready">
-          <h2>1 · Device</h2>
-          <button id="detect">Detect device</button>
-          <p class="hint">Plug in your device via USB. Please ensure the cable is not a power-only one.</p>
+        <div class="row">
+          <input type="text" id="repo" placeholder="owner/repo  —  e.g. apurv123/firmforge" />
+          <button id="addSource">Add source</button>
         </div>
-        <div class="step" data-state="pending">
-          <h2>2 · Firmware</h2>
-          <button disabled>Select firmware</button>
-          <p class="hint">Choose a release, or sideload a release zip downloaded from GitHub.</p>
-        </div>
-        <div class="step" data-state="pending">
-          <h2>3 · Flash</h2>
-          <button disabled>Flash</button>
-          <p class="hint">Update keeps your settings. Erase &amp; install clean starts from scratch.</p>
-        </div>
+        <p class="meta" style="margin-top:8px">
+          The catalogue ships empty on purpose: you choose what firmware to trust.
+          firmforge prefers linking to a publisher's own release assets over rehosting their binaries.
+        </p>
+
+        <div id="sourceList"></div>
       </section>
 
-      <pre id="out">Detected ports will appear here.</pre>
+      <section id="screen-catalogue" hidden>
+        <h1>Catalogue</h1>
+        <p class="sub">Firmware from your sources, checked against the selected device.</p>
+        <div id="catalogueList"></div>
+      </section>
+
+      <section id="screen-device" hidden>
+        <h1>Device</h1>
+        <p class="sub">Choose real hardware, or the demo device to try the whole workflow safely.</p>
+
+        <div class="row">
+          <button id="detect">Detect connected devices</button>
+          <button class="ghost" id="useDemo">Use demo device</button>
+        </div>
+        <div id="deviceInfo"></div>
+      </section>
+
+      <section id="screen-install" hidden>
+        <h1>Install</h1>
+        <p class="sub" id="installSub">Pick a firmware from the catalogue first.</p>
+        <div id="installBody"></div>
+        <div class="bar"><div id="progress"></div></div>
+        <div class="meta" id="progressText">Idle.</div>
+      </section>
+
+      <section id="screen-console" hidden>
+        <h1>Console</h1>
+        <p class="sub">Everything firmforge did, in order.</p>
+        <pre id="log">Ready.</pre>
+      </section>
     </main>
 
-    <script type="module">
-      const out = document.getElementById("out");
-      const chip = document.getElementById("chip");
+    <script>
+      const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
+      const listen = window.__TAURI__ && window.__TAURI__.event && window.__TAURI__.event.listen;
 
-      document.getElementById("detect").addEventListener("click", async () => {
+      const state = {
+        discovered: JSON.parse(localStorage.getItem("discovered") || "[]"),
+        device: null,
+        selection: null,
+      };
+
+      const $ = (id) => document.getElementById(id);
+      const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+      const kb = (n) => n >= 1048576 ? (n / 1048576).toFixed(2) + " MB" : (n / 1024).toFixed(0) + " kB";
+
+      function log(line) {
+        const el = $("log");
+        const stamp = new Date().toLocaleTimeString();
+        el.textContent = (el.textContent === "Ready." ? "" : el.textContent + "\n") + "[" + stamp + "] " + line;
+        el.scrollTop = el.scrollHeight;
+      }
+
+      document.querySelectorAll("nav a").forEach((a) => {
+        a.addEventListener("click", () => show(a.dataset.screen));
+      });
+      function show(name) {
+        document.querySelectorAll("nav a").forEach((a) =>
+          a.setAttribute("aria-current", a.dataset.screen === name ? "page" : "false"));
+        ["sources", "catalogue", "device", "install", "console"].forEach((s) => {
+          $("screen-" + s).hidden = s !== name;
+        });
+      }
+
+      const save = () => localStorage.setItem("discovered", JSON.stringify(state.discovered));
+
+      // ── sources ────────────────────────────────────────────────
+      $("addSource").addEventListener("click", addSource);
+      $("repo").addEventListener("keydown", (e) => { if (e.key === "Enter") addSource(); });
+
+      async function addSource() {
+        const repo = $("repo").value.trim();
+        if (!repo) return;
+        const button = $("addSource");
+        button.disabled = true;
+        button.textContent = "Reading…";
+        log("Reading firmware from " + repo + "…");
         try {
-          const { invoke } = window.__TAURI__.core;
-          const ports = await invoke("list_ports");
-          out.textContent = JSON.stringify(ports, null, 2);
-          chip.textContent = ports.length
-            ? `${ports.length} port(s) found — ${ports[0].portName}`
-            : "No serial ports found";
+          const found = await invoke("add_source", { repo });
+          state.discovered = state.discovered
+            .filter((d) => d.source !== found[0].source)
+            .concat(found);
+          save();
+          $("repo").value = "";
+          log("Found " + found.length + " manifest(s) in " + found[0].source + ".");
+          renderSources();
+          renderCatalogue();
         } catch (e) {
-          out.textContent = `Not running inside firmforge desktop: ${e}`;
+          log("Could not add " + repo + ": " + e);
+          renderSources(String(e));
+        } finally {
+          button.disabled = false;
+          button.textContent = "Add source";
+        }
+      }
+
+      function renderSources(error) {
+        const host = $("sourceList");
+        host.innerHTML = "";
+        if (error) {
+          host.insertAdjacentHTML("beforeend",
+            '<div class="banner bad" style="margin-top:16px">' + esc(error) + "</div>");
+        }
+        const slugs = [...new Set(state.discovered.map((d) => d.source))];
+        if (!slugs.length) {
+          host.insertAdjacentHTML("beforeend",
+            '<div class="empty">No sources yet. Try <code>esphome/firmware</code>, or your own repository.</div>');
+          return;
+        }
+        slugs.forEach((slug) => {
+          const items = state.discovered.filter((d) => d.source === slug);
+          const builds = items.reduce((n, d) => n + d.manifest.builds.length, 0);
+          host.insertAdjacentHTML("beforeend",
+            '<div class="card"><div class="cardhead"><div>' +
+              "<h3>" + esc(slug) + "</h3>" +
+              '<div class="meta">' + items.length + " manifest(s), " + builds + " build(s)</div>" +
+            '</div><button class="ghost small" data-remove="' + esc(slug) + '">Remove</button></div>' +
+            '<div class="tags">' + items.map((i) => '<span class="tag">' + esc(i.provenance) + "</span>").join("") + "</div></div>");
+        });
+        host.querySelectorAll("[data-remove]").forEach((b) =>
+          b.addEventListener("click", () => {
+            state.discovered = state.discovered.filter((d) => d.source !== b.dataset.remove);
+            save(); renderSources(); renderCatalogue();
+            log("Removed source " + b.dataset.remove + ".");
+          }));
+      }
+
+      // ── device ─────────────────────────────────────────────────
+      $("useDemo").addEventListener("click", async () => {
+        state.device = await invoke("demo_device");
+        log("Selected the demo device (ESP32-S3, 8 MB flash). Nothing will be written.");
+        renderDevice();
+        renderCatalogue();
+      });
+
+      $("detect").addEventListener("click", async () => {
+        try {
+          const ports = await invoke("list_ports");
+          log("Found " + ports.length + " serial port(s).");
+          $("deviceInfo").innerHTML = ports.length
+            ? ports.map((p) =>
+                '<div class="card"><h3>' + esc(p.portName) + "</h3>" +
+                '<div class="meta">' + esc(p.product || "Unknown device") + "</div>" +
+                '<div class="tags"><span class="tag warn">Real flashing not implemented yet</span></div></div>').join("")
+            : '<div class="empty">No serial ports found. Plug in a board, or use the demo device.</div>';
+        } catch (e) {
+          log("Port scan failed: " + e);
         }
       });
+
+      function renderDevice() {
+        const d = state.device;
+        if (!d) return;
+        const i = d.identity;
+        $("chip").innerHTML = "<b>" + esc(i.chipFamily) + "</b><br>" + esc(d.port) + (d.demo ? " · demo" : "");
+        $("deviceInfo").innerHTML =
+          '<div class="card"><div class="cardhead"><div>' +
+            "<h3>" + esc(i.chipFamily) + "</h3>" +
+            '<div class="meta">' + esc(d.port) + " · " + kb(i.flashSize) + " flash · " +
+              (i.hasPsram ? "PSRAM" : "no PSRAM") + " · " + esc(i.serialType) + "</div>" +
+          "</div>" + (d.demo ? '<span class="tag warn">Demo</span>' : "") + "</div>" +
+          (d.demo ? '<p class="meta" style="margin-top:10px">A simulated ESP32-S3. Firmware is really downloaded and really verified; only the write to hardware is simulated.</p>' : "") +
+          "</div>";
+      }
+
+      // ── catalogue ──────────────────────────────────────────────
+      async function renderCatalogue() {
+        const host = $("catalogueList");
+        if (!state.discovered.length) {
+          host.innerHTML = '<div class="empty">Nothing yet — add a source first.</div>';
+          return;
+        }
+        const entries = await invoke("catalogue_for", {
+          discovered: state.discovered,
+          device: state.device ? state.device.identity : null,
+        });
+
+        host.innerHTML = state.device ? "" :
+          '<div class="banner info">No device selected, so nothing is being filtered. Pick a device to see what actually fits.</div>';
+
+        entries.forEach((e, index) => {
+          const compatible = e.compatibility.compatible;
+          const tags = ['<span class="tag">' + esc(e.chipFamily) + "</span>",
+            '<span class="tag">' + esc(e.channel) + "</span>",
+            e.verified ? '<span class="tag ok">Signed</span>' : '<span class="tag warn">Unsigned</span>']
+            .concat(e.capabilities.map((c) => '<span class="tag">' + esc(c) + "</span>")).join("");
+
+          host.insertAdjacentHTML("beforeend",
+            '<div class="card ' + (compatible ? "" : "dim") + '"><div class="cardhead"><div>' +
+              "<h3>" + esc(e.name) + " " + esc(e.version) + (e.variant ? " · " + esc(e.variant) : "") + "</h3>" +
+              '<div class="meta">' + esc(e.source) + " · " + esc(e.provenance) + " · " + e.partCount + " part(s)</div>" +
+            '</div><button class="small" data-install="' + index + '"' + (compatible ? "" : " disabled") + ">Install</button></div>" +
+            '<div class="tags">' + tags + "</div>" +
+            (compatible ? "" : '<ul class="reasons">' + e.reasons.map((r) => "<li>" + esc(r) + "</li>").join("") + "</ul>") +
+            "</div>");
+        });
+
+        host.querySelectorAll("[data-install]").forEach((b) =>
+          b.addEventListener("click", () => choose(entries[+b.dataset.install])));
+      }
+
+      // ── install ────────────────────────────────────────────────
+      async function choose(entry) {
+        const discovered = state.discovered.find(
+          (d) => d.source === entry.source && d.manifestUrl === entry.manifestUrl);
+        if (!discovered) return;
+
+        state.selection = { discovered: discovered, buildIndex: entry.buildIndex };
+        show("install");
+        $("installSub").textContent =
+          entry.name + " " + entry.version + " — downloading and verifying before anything is written.";
+        $("installBody").innerHTML = '<div class="banner info">Downloading and checking every part…</div>';
+        log("Preparing " + entry.name + " " + entry.version + " from " + entry.source + ".");
+
+        try {
+          const plan = await invoke("prepare_install", {
+            discovered: discovered, buildIndex: entry.buildIndex,
+          });
+          renderPlan(plan);
+          log("Prepared " + kb(plan.totalBytes) + " across " + plan.parts.length + " part(s).");
+        } catch (e) {
+          $("installBody").innerHTML = '<div class="banner bad">' + esc(e) + "</div>";
+          log("Preparation failed: " + e);
+        }
+      }
+
+      function renderPlan(plan) {
+        const rows = plan.parts.map((p) =>
+          '<tr><td class="num">' + esc(p.offset) + "</td>" +
+          '<td class="num">' + kb(p.sizeBytes) + "</td>" +
+          "<td>" + (p.verified ? '<span class="tag ok">SHA-256 ok</span>' : '<span class="tag warn">No checksum</span>') + "</td>" +
+          '<td><span class="tag">' + (p.upstream ? "Upstream" : "Rehosted") + "</span></td>" +
+          '<td class="url meta">' + esc(p.url) + "</td></tr>").join("");
+
+        $("installBody").innerHTML =
+          '<div class="card"><div class="cardhead"><div>' +
+            "<h3>" + esc(plan.name) + " " + esc(plan.version) + "</h3>" +
+            '<div class="meta">' + esc(plan.chipFamily) + " · " + kb(plan.totalBytes) +
+              " · onto " + esc(state.device ? state.device.port : "no device") + "</div>" +
+          '</div><button id="go"' + (state.device ? "" : " disabled") + ">" +
+            (state.device && state.device.demo ? "Run demo install" : "Flash") + "</button></div>" +
+          (plan.fullyVerified
+            ? '<div class="tags"><span class="tag ok">Every part checksum-verified</span></div>'
+            : '<div class="tags"><span class="tag warn">Some parts have no checksum in the manifest</span></div>') +
+          "<table><thead><tr><th>Offset</th><th>Size</th><th>Integrity</th><th>Origin</th><th>Source</th></tr></thead>" +
+          "<tbody>" + rows + "</tbody></table></div>";
+
+        const go = $("go");
+        if (go) go.addEventListener("click", runInstall);
+      }
+
+      async function runInstall() {
+        const sel = state.selection;
+        $("go").disabled = true;
+        try {
+          await invoke("run_install", {
+            discovered: sel.discovered,
+            buildIndex: sel.buildIndex,
+            demo: !!state.device.demo,
+          });
+        } catch (e) {
+          $("progressText").textContent = String(e);
+          log("Install failed: " + e);
+        } finally {
+          $("go").disabled = false;
+        }
+      }
+
+      // ── flash events ───────────────────────────────────────────
+      if (listen) {
+        listen("flash", ({ payload }) => {
+          if (payload.kind === "started") {
+            $("progress").style.width = "0%";
+            $("progressText").textContent = "Writing " + payload.parts + " part(s), " +
+              kb(payload.totalBytes) + (payload.demo ? " (demo)" : "") + "…";
+          } else if (payload.kind === "partStarted") {
+            log("Part " + payload.index + "/" + payload.parts + " at " + payload.offset +
+                " (" + kb(payload.sizeBytes) + ")");
+          } else if (payload.kind === "progress") {
+            $("progress").style.width = payload.percent + "%";
+            $("progressText").textContent = payload.percent + "% — " +
+              kb(payload.writtenBytes) + " of " + kb(payload.totalBytes);
+          } else if (payload.kind === "log") {
+            log(payload.line);
+          } else if (payload.kind === "finished") {
+            $("progress").style.width = "100%";
+            $("progressText").textContent = "Done in " + payload.seconds.toFixed(1) + "s" +
+              (payload.demo ? " — demo only, nothing was written" : "") + ".";
+            log("Install complete.");
+          } else if (payload.kind === "failed") {
+            $("progressText").textContent = payload.message;
+            log("Failed: " + payload.message);
+          }
+        });
+      }
+
+      if (!invoke) {
+        document.querySelector("main").insertAdjacentHTML("afterbegin",
+          '<div class="banner bad">Not running inside the firmforge desktop app.</div>');
+      } else {
+        renderSources();
+        renderCatalogue();
+        log("firmforge ready.");
+      }
     </script>
   </body>
 </html>
