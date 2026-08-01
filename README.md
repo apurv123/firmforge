@@ -56,6 +56,7 @@ Next: **M1 — Read** (GitHub sourcing, catalogue UI, cache). See the [roadmap](
 | [`plan/spec/firmforge-spec.md`](plan/spec/firmforge-spec.md) | **The product specification** — desktop and mobile app descriptions, features, 7 workflows, 19 UX screens, architecture, roadmap, metrics |
 | [`plan/spec/pm-requirements.md`](plan/spec/pm-requirements.md) | PM/technical requirements — GitHub sourcing, flashing stack, platform constraints, security model, NFRs, risks |
 | [`plan/spec/product-research/`](plan/spec/product-research/) | Teardowns of Bruce, ESP32 Marauder, ESPHome, ESP Web Tools, M5Burner, Meshtastic and Flipper Zero, with 52 screenshots |
+| [`plan/spec/legal-and-licensing.md`](plan/spec/legal-and-licensing.md) | Licence obligations around redistributing firmware, trademark and app-store constraints |
 | [`firmware/README.md`](firmware/README.md) | The firmware repository convention |
 
 ## Installing and testing

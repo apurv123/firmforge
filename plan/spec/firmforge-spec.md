@@ -244,14 +244,14 @@ Bottom tab bar: **Devices · Catalogue · Console · Settings**.
 
 | # | Screen | Contents |
 |---|---|---|
-| **M1** | **Devices** | Vertical cards, status-first: `Up to date` / `Update available · 1.16` / `Unverified`. Pull to refresh. |
-| **M2** | **Device detail** | Big status ring, firmware version, transport (USB-OTG / BLE) with signal, quick actions: Update · Console · Config · Backup. |
-| **M3** | **Update sheet** | Version diff, changelog highlights, size, verification badge, "keeps your settings" reassurance, single `Update` button, live progress that survives screen-lock. |
-| **M4** | **Connect** | Transport chooser: `USB-OTG` (Android; system permission dialog explained beforehand) or `Bluetooth` (permission rationale shown at point of use, `neverForLocation`). |
-| **M5** | **Catalogue** | Single-column cards, same facets as D3, filtered by the connected device by default. |
-| **M6** | **Console** | Mono log, tap to pause, share/export, quick-command chips. |
-| **M7** | **Field reference** *(offline)* | Per-board: photo, pinout, **download-mode instructions**, recovery steps. Works with no signal. |
-| **M8** | **Settings** | Watched repos + notification prefs, language, theme, cache, sign-in, telemetry off by default. |
+| **MS1** | **Devices** | Vertical cards, status-first: `Up to date` / `Update available · 1.16` / `Unverified`. Pull to refresh. |
+| **MS2** | **Device detail** | Big status ring, firmware version, transport (USB-OTG / BLE) with signal, quick actions: Update · Console · Config · Backup. |
+| **MS3** | **Update sheet** | Version diff, changelog highlights, size, verification badge, "keeps your settings" reassurance, single `Update` button, live progress that survives screen-lock. |
+| **MS4** | **Connect** | Transport chooser: `USB-OTG` (Android; system permission dialog explained beforehand) or `Bluetooth` (permission rationale shown at point of use, `neverForLocation`). |
+| **MS5** | **Catalogue** | Single-column cards, same facets as D3, filtered by the connected device by default. |
+| **MS6** | **Console** | Mono log, tap to pause, share/export, quick-command chips. |
+| **MS7** | **Field reference** *(offline)* | Per-board: photo, pinout, **download-mode instructions**, recovery steps. Works with no signal. |
+| **MS8** | **Settings** | Watched repos + notification prefs, language, theme, cache, sign-in, telemetry off by default. |
 
 ### 9.3 Cross-cutting UX principles
 
@@ -294,7 +294,7 @@ Key dependencies (versions verified 2026-08-01): `tauri` 2.11 · `espflash` 4.5 
 | **M2 — Write** | Chip detection, pre-flight, multi-part flash, verify, console (D2/D5/D6/D8) | Flash a real ESP32-S3 end to end, verified |
 | **M3 — Live with it** | Library, history, snapshots, rollback, assets, driver doctor (D1/D7/D11) | Update → break → roll back, settings intact |
 | **M4 — Trust** | Ed25519 signing, TOFU pinning, verified filter, publish Action | A signed release shows a green badge; tampering is refused |
-| **M5 — Pocket** | Android USB-host plugin, mobile shell, notifications (M1–M4) | Flash a board from a phone with no computer |
+| **M5 — Pocket** | Android USB-host plugin, mobile shell, notifications (MS1-MS4) | Flash a board from a phone with no computer |
 | **M6 — Wireless** | BLE console/config + BLE OTA; iOS app | iOS updates an OTA-capable device over BLE |
 | **M7 — Fleet** | Multi-device drift view, staged rollout, CLI | Update 10 devices from one screen |
 
