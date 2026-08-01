@@ -1,0 +1,21 @@
+[
+  {
+    "slug": "bruce-firmware",
+    "name": "08-bruce-lab",
+    "url": "https://bruce.computer/my_bruce",
+    "ok": true
+  },
+  {
+    "slug": "bruce-firmware",
+    "name": "11-theme-builder",
+    "url": "https://bruce.computer/build_theme.html",
+    "ok": true
+  },
+  {
+    "slug": "bruce-firmware",
+    "name": "12-forum",
+    "url": "https://forum.bruce.computer/",
+    "ok": false,
+    "error": "Error: page.goto: net::ERR_CERT_DATE_INVALID at https://forum.bruce.computer/"
+  }
+]

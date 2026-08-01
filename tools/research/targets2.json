@@ -1,0 +1,29 @@
+{
+  "bruce-firmware": [
+    { "name": "07-app-store", "url": "https://bruce.computer/appstore", "wait": 6000 },
+    { "name": "08-bruce-lab", "url": "https://bruce.computer/lab", "wait": 6000 },
+    { "name": "09-boards", "url": "https://bruce.computer/boards", "wait": 5000 },
+    { "name": "10-wiki", "url": "https://wiki.bruce.computer/", "wait": 5000 },
+    { "name": "11-theme-builder", "url": "https://bruce.computer/themebuilder", "wait": 6000 }
+  ],
+  "esp32-marauder": [
+    { "name": "07-wiki-updating-sd", "url": "https://github.com/justcallmekoko/ESP32Marauder/wiki/updating-marauder" },
+    { "name": "08-hardware-store", "url": "https://www.justcallmekokollc.com/", "wait": 5000 }
+  ],
+  "esphome": [
+    { "name": "08-builder-docs", "url": "https://esphome.io/guides/getting_started_command_line" },
+    { "name": "09-dashboard-import", "url": "https://esphome.io/guides/creators" }
+  ],
+  "m5burner": [
+    { "name": "04-uiflow", "url": "https://uiflow2.m5stack.com/", "wait": 8000 },
+    { "name": "05-m5stack-products", "url": "https://shop.m5stack.com/", "wait": 6000 }
+  ],
+  "meshtastic": [
+    { "name": "07-android-download", "url": "https://play.google.com/store/apps/details?id=com.geeksville.mesh", "wait": 6000 },
+    { "name": "08-firmware-releases", "url": "https://github.com/meshtastic/firmware/releases" }
+  ],
+  "flipper-zero": [
+    { "name": "07-mobile-app-docs", "url": "https://docs.flipper.net/mobile-app/android", "wait": 5000 },
+    { "name": "08-firmware-update-docs", "url": "https://docs.flipper.net/basics/firmware-update", "wait": 5000 }
+  ]
+}

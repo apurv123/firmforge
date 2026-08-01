@@ -1,0 +1,53 @@
+{
+  "bruce-firmware": [
+    { "name": "01-homepage", "url": "https://bruce.computer/" },
+    { "name": "02-github-repo", "url": "https://github.com/pr3y/Bruce" },
+    { "name": "03-web-flasher", "url": "https://bruce.computer/flasher", "wait": 6000 },
+    { "name": "04-docs-features", "url": "https://github.com/pr3y/Bruce/wiki" },
+    { "name": "05-issues", "url": "https://github.com/pr3y/Bruce/issues?q=is%3Aissue+sort%3Areactions-%2B1-desc" },
+    { "name": "06-releases", "url": "https://github.com/pr3y/Bruce/releases" }
+  ],
+  "esp32-marauder": [
+    { "name": "01-github-repo", "url": "https://github.com/justcallmekoko/ESP32Marauder" },
+    { "name": "02-wiki-home", "url": "https://github.com/justcallmekoko/ESP32Marauder/wiki" },
+    { "name": "03-web-flasher", "url": "https://justcallmekoko.github.io/ESP32Marauder/", "wait": 6000 },
+    { "name": "04-releases", "url": "https://github.com/justcallmekoko/ESP32Marauder/releases" },
+    { "name": "05-issues-top", "url": "https://github.com/justcallmekoko/ESP32Marauder/issues?q=is%3Aissue+sort%3Areactions-%2B1-desc" },
+    { "name": "06-wiki-flashing", "url": "https://github.com/justcallmekoko/ESP32Marauder/wiki/update-firmware" }
+  ],
+  "esphome": [
+    { "name": "01-homepage", "url": "https://esphome.io/" },
+    { "name": "02-web-esphome-io", "url": "https://web.esphome.io/", "wait": 6000 },
+    { "name": "03-guides-getting-started", "url": "https://esphome.io/guides/getting_started_hassio" },
+    { "name": "04-components-index", "url": "https://esphome.io/components/" },
+    { "name": "05-ota-component", "url": "https://esphome.io/components/ota/" },
+    { "name": "06-github-issues-top", "url": "https://github.com/esphome/esphome/issues?q=is%3Aissue+sort%3Areactions-%2B1-desc" },
+    { "name": "07-feature-requests", "url": "https://github.com/esphome/feature-requests/issues?q=is%3Aissue+sort%3Areactions-%2B1-desc" }
+  ],
+  "esp-web-tools": [
+    { "name": "01-landing", "url": "https://esphome.github.io/esp-web-tools/", "wait": 6000 },
+    { "name": "02-github-repo", "url": "https://github.com/esphome/esp-web-tools" },
+    { "name": "03-issues-top", "url": "https://github.com/esphome/esp-web-tools/issues?q=is%3Aissue+sort%3Areactions-%2B1-desc" }
+  ],
+  "m5burner": [
+    { "name": "01-m5stack-download", "url": "https://docs.m5stack.com/en/download" },
+    { "name": "02-m5burner-docs", "url": "https://docs.m5stack.com/en/uiflow/m5burner/intro" },
+    { "name": "03-community", "url": "https://community.m5stack.com/category/22/m5-burner" }
+  ],
+  "meshtastic": [
+    { "name": "01-homepage", "url": "https://meshtastic.org/" },
+    { "name": "02-web-flasher", "url": "https://flasher.meshtastic.org/", "wait": 8000 },
+    { "name": "03-downloads", "url": "https://meshtastic.org/docs/software/" },
+    { "name": "04-android-app-docs", "url": "https://meshtastic.org/docs/software/android/usage/" },
+    { "name": "05-github-firmware-issues", "url": "https://github.com/meshtastic/firmware/issues?q=is%3Aissue+sort%3Areactions-%2B1-desc" },
+    { "name": "06-web-client", "url": "https://client.meshtastic.org/", "wait": 8000 }
+  ],
+  "flipper-zero": [
+    { "name": "01-homepage", "url": "https://flipperzero.one/" },
+    { "name": "02-update-qflipper", "url": "https://flipperzero.one/update" },
+    { "name": "03-lab-web-updater", "url": "https://lab.flipper.net/", "wait": 8000 },
+    { "name": "04-apps-catalog", "url": "https://lab.flipper.net/apps", "wait": 8000 },
+    { "name": "05-docs-mobile-app", "url": "https://docs.flipper.net/mobile-app" },
+    { "name": "06-qflipper-repo", "url": "https://github.com/flipperdevices/qFlipper" }
+  ]
+}
