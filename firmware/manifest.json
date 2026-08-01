@@ -1,0 +1,47 @@
+{
+  "name": "firmforge Example Firmware",
+  "version": "0.1.0",
+  "channel": "stable",
+  "funding_url": "https://github.com/apurv123/firmforge",
+  "releaseNotesUrl": "https://github.com/apurv123/firmforge/blob/main/firmware/CHANGELOG.md",
+  "builds": [
+    {
+      "chipFamily": "ESP32-S3",
+      "serialType": "cdc",
+      "boardIds": ["m5stack-cardputer", "lilygo-t-deck"],
+      "capabilities": ["wifi", "ble", "ir"],
+      "constraints": {
+        "minFlashSize": 8388608
+      },
+      "otaProtocol": "ble-nus",
+      "parts": [
+        { "path": "builds/0.1.0/esp32s3/bootloader.bin", "offset": 4096, "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
+        { "path": "builds/0.1.0/esp32s3/partitions.bin", "offset": 32768, "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
+        { "path": "builds/0.1.0/esp32s3/boot_app0.bin", "offset": 57344, "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
+        { "path": "builds/0.1.0/esp32s3/app.bin", "offset": 65536, "sha256": "0000000000000000000000000000000000000000000000000000000000000000" }
+      ],
+      "assets": [
+        { "path": "builds/0.1.0/assets/default-theme.bin", "target": "/firmforge/themes/default.bin", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" }
+      ]
+    },
+    {
+      "chipFamily": "ESP32-S3",
+      "serialType": "uart",
+      "variant": "LITE_VERSION",
+      "variantOmits": ["ssh", "wireguard", "interpreter"],
+      "capabilities": ["wifi", "ble"],
+      "parts": [
+        { "path": "builds/0.1.0/esp32s3-uart/bootloader.bin", "offset": 4096 },
+        { "path": "builds/0.1.0/esp32s3-uart/app.bin", "offset": 65536 }
+      ]
+    },
+    {
+      "chipFamily": "ESP32-C3",
+      "capabilities": ["wifi", "ble"],
+      "parts": [
+        { "path": "builds/0.1.0/esp32c3/bootloader.bin", "offset": 0 },
+        { "path": "builds/0.1.0/esp32c3/app.bin", "offset": 65536 }
+      ]
+    }
+  ]
+}

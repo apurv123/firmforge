@@ -5,9 +5,9 @@ Cargo.lock.bak
 
 # Node
 node_modules/
-dist/
 .vite/
 *.tsbuildinfo
+# note: ui/dist is checked in — it is the static desktop shell served by Tauri
 
 # Tauri
 apps/**/gen/

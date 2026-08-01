@@ -1,0 +1,14 @@
+[package]
+name = "firmforge-app"
+description = "Shared firmforge application surface, wrapped as commands by the desktop and mobile shells"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+firmforge-core.workspace = true
+firmforge-flash.workspace = true
+serde.workspace = true
+serde_json.workspace = true

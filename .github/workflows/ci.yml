@@ -1,0 +1,46 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: cargo test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      # Linux needs libudev for serial enumeration; the Tauri shell additionally
+      # needs WebKitGTK. Kept as its own step so a failure is self-explanatory.
+      - name: Install Linux system dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (core crates)
+        run: cargo clippy -p firmforge-core -p firmforge-flash -p firmforge-app -- -D warnings
+
+      - name: Test (core crates)
+        run: cargo test -p firmforge-core -p firmforge-flash -p firmforge-app
+
+      - name: Check desktop shell
+        run: cargo check -p firmforge-desktop

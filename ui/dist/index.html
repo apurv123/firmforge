@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>firmforge</title>
+    <style>
+      :root {
+        --bg: #0d0f14; --panel: #151922; --line: #232936;
+        --text: #e6e9ef; --muted: #8b94a7; --accent: #7c5cff; --ok: #3ecf8e;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: var(--bg); color: var(--text);
+        font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        display: grid; grid-template-columns: 220px 1fr; height: 100vh;
+      }
+      nav { background: var(--panel); border-right: 1px solid var(--line); padding: 18px 12px; display: flex; flex-direction: column; }
+      .brand { font-weight: 700; letter-spacing: .04em; padding: 4px 10px 18px; }
+      .brand span { color: var(--accent); }
+      nav a { display: block; padding: 9px 10px; border-radius: 8px; color: var(--muted); text-decoration: none; }
+      nav a[aria-current="page"] { background: #1e2431; color: var(--text); }
+      .device-chip { margin-top: auto; border: 1px solid var(--line); border-radius: 10px; padding: 10px; color: var(--muted); font-size: 12px; }
+      main { padding: 28px 32px; overflow: auto; }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      p.sub { color: var(--muted); margin: 0 0 24px; }
+      .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+      .step { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+      .step[data-state="pending"] { opacity: .45; }
+      .step h2 { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+      button { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 9px 14px; font: inherit; cursor: pointer; }
+      button:disabled { background: #2a3040; color: var(--muted); cursor: not-allowed; }
+      .hint { color: var(--muted); font-size: 12px; margin-top: 10px; }
+      pre { background: #0a0c11; border: 1px solid var(--line); border-radius: 10px; padding: 12px; color: var(--muted); overflow: auto; margin-top: 24px; }
+      .ok { color: var(--ok); }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <div class="brand">firm<span>forge</span></div>
+      <a href="#" aria-current="page">Library</a>
+      <a href="#">Catalogue</a>
+      <a href="#">Sources</a>
+      <a href="#">Console</a>
+      <a href="#">Settings</a>
+      <div class="device-chip" id="chip">No device connected</div>
+    </nav>
+
+    <main>
+      <h1>Connect a device</h1>
+      <p class="sub">Screen D2 — see <code>plan/spec/firmforge-spec.md</code> §9.1</p>
+
+      <section class="steps">
+        <div class="step" data-state="ready">
+          <h2>1 · Device</h2>
+          <button id="detect">Detect device</button>
+          <p class="hint">Plug in your device via USB. Please ensure the cable is not a power-only one.</p>
+        </div>
+        <div class="step" data-state="pending">
+          <h2>2 · Firmware</h2>
+          <button disabled>Select firmware</button>
+          <p class="hint">Choose a release, or sideload a release zip downloaded from GitHub.</p>
+        </div>
+        <div class="step" data-state="pending">
+          <h2>3 · Flash</h2>
+          <button disabled>Flash</button>
+          <p class="hint">Update keeps your settings. Erase &amp; install clean starts from scratch.</p>
+        </div>
+      </section>
+
+      <pre id="out">Detected ports will appear here.</pre>
+    </main>
+
+    <script type="module">
+      const out = document.getElementById("out");
+      const chip = document.getElementById("chip");
+
+      document.getElementById("detect").addEventListener("click", async () => {
+        try {
+          const { invoke } = window.__TAURI__.core;
+          const ports = await invoke("list_ports");
+          out.textContent = JSON.stringify(ports, null, 2);
+          chip.textContent = ports.length
+            ? `${ports.length} port(s) found — ${ports[0].portName}`
+            : "No serial ports found";
+        } catch (e) {
+          out.textContent = `Not running inside firmforge desktop: ${e}`;
+        }
+      });
+    </script>
+  </body>
+</html>
