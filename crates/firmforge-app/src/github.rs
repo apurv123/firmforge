@@ -105,7 +105,11 @@ pub async fn discover(source: &Source) -> Result<Vec<DiscoveredManifest>> {
     if let Ok(m) = manifest_from_default_branch(&http, source).await {
         found.push(m);
     }
-    found.extend(manifests_from_releases(&http, source).await.unwrap_or_default());
+    found.extend(
+        manifests_from_releases(&http, source)
+            .await
+            .unwrap_or_default(),
+    );
 
     if found.is_empty() {
         return Err(Error::NoManifest(source.slug()));
@@ -185,10 +189,7 @@ async fn manifests_from_releases(
     Ok(out)
 }
 
-async fn get_json<T: serde::de::DeserializeOwned>(
-    http: &reqwest::Client,
-    url: &str,
-) -> Result<T> {
+async fn get_json<T: serde::de::DeserializeOwned>(http: &reqwest::Client, url: &str) -> Result<T> {
     let response = http
         .get(url)
         .send()

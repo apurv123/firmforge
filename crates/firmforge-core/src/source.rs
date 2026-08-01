@@ -40,8 +40,8 @@ pub struct ResolvedPart {
 /// Precedence: explicit `url`, then an absolute `path`, then `path` resolved
 /// relative to `manifest_url` (the ESP Web Tools rule).
 pub fn resolve(part: &Part, manifest_url: &str) -> Result<ResolvedPart> {
-    let base = Url::parse(manifest_url)
-        .map_err(|e| Error::InvalidUrl(format!("{manifest_url}: {e}")))?;
+    let base =
+        Url::parse(manifest_url).map_err(|e| Error::InvalidUrl(format!("{manifest_url}: {e}")))?;
 
     let raw = part.url.as_deref().unwrap_or(&part.path);
     let resolved = base
@@ -128,8 +128,18 @@ mod tests {
     #[test]
     fn order_and_offsets_survive_resolution() {
         let parts = vec![
-            Part { path: "boot.bin".into(), offset: 0, sha256: None, url: None },
-            Part { path: "app.bin".into(), offset: 0x10000, sha256: None, url: None },
+            Part {
+                path: "boot.bin".into(),
+                offset: 0,
+                sha256: None,
+                url: None,
+            },
+            Part {
+                path: "app.bin".into(),
+                offset: 0x10000,
+                sha256: None,
+                url: None,
+            },
         ];
         let r = resolve_all(&parts, MANIFEST_URL).unwrap();
         assert_eq!(r.len(), 2);

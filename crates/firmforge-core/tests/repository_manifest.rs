@@ -10,8 +10,8 @@
 
 use firmforge_core::device::{DeviceIdentity, SerialType};
 use firmforge_core::manifest::Manifest;
-use firmforge_core::source::{resolve_all, Origin};
 use firmforge_core::matching;
+use firmforge_core::source::{resolve_all, Origin};
 
 const MANIFEST_URL: &str =
     "https://raw.githubusercontent.com/apurv123/firmforge/main/firmware/manifest.json";
@@ -62,7 +62,11 @@ fn every_part_is_referenced_upstream_not_rehosted() {
 fn bootloader_offsets_match_the_chip() {
     let m = load();
 
-    let s3 = m.builds.iter().find(|b| b.chip_family == "ESP32-S3").unwrap();
+    let s3 = m
+        .builds
+        .iter()
+        .find(|b| b.chip_family == "ESP32-S3")
+        .unwrap();
     assert_eq!(s3.parts[0].offset, 0x0);
 
     let esp32 = m.builds.iter().find(|b| b.chip_family == "ESP32").unwrap();
@@ -105,7 +109,8 @@ fn an_esp32_board_selects_the_esp32_build_not_the_s3_one() {
         mac: None,
     };
 
-    let chosen = matching::select_best(&m.builds, &device).expect("an ESP32 build must be selectable");
+    let chosen =
+        matching::select_best(&m.builds, &device).expect("an ESP32 build must be selectable");
     assert_eq!(chosen.chip_family, "ESP32");
 }
 
@@ -123,6 +128,7 @@ fn the_demo_device_can_install_the_example() {
         mac: None,
     };
 
-    let chosen = matching::select_best(&m.builds, &demo).expect("the demo device must have a build");
+    let chosen =
+        matching::select_best(&m.builds, &demo).expect("the demo device must have a build");
     assert_eq!(chosen.chip_family, "ESP32-S3");
 }
