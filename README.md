@@ -65,8 +65,9 @@ produced by CI — see [Installing and testing](#installing-and-testing).
   part, and reads it back to confirm what landed
 - **Talk to the board afterwards.** The Playground screen is a real serial
   console: watch output, type at the prompt, interrupt a running program with
-  Ctrl-C, soft reboot with Ctrl-D. On MicroPython it also runs scripts and
-  saves files to the board — name one `main.py` and it runs on every power-up.
+  Ctrl-C, soft reboot with Ctrl-D. Three tabs — Prompt, Run a script, Files —
+  and on MicroPython it runs scripts and saves files to the board; name one
+  `main.py` and it runs on every power-up.
   That is the job people currently install Thonny for.
 
 **What does not work yet**
@@ -120,17 +121,20 @@ bricked.
    and MAC from the silicon itself, and the top bar shows what you are plugged
    into from then on. *What is on this board?* tells you which firmware is
    already there before you overwrite it.
-3. **Flash** → pick **MicroPython** from the list. The review pane on the right
-   shows every file about to be written, where each lands in flash, and whether
-   its checksum matched — then *Flash to COM6*. Builds meant for another chip
-   stay dimmed and say why, and firmforge refuses one even if you force it.
-4. **Playground** → pick the same port → *Connect* → *Interrupt (Ctrl-C)*. The
-   `>>>` prompt appears. Type `print(2 ** 10)` and press Enter.
-5. Paste a script into **Run a script** and press *Run on board*. Indentation
-   survives, and an exception comes back as an error rather than being lost in
-   the output.
-6. Put it in **Put a file on the board** as `main.py` and press *Save and
-   reboot*. It now runs every time the board powers on.
+3. **Flash** → firmware for your chip is laid out three across. Press *Review*
+   on **MicroPython** and a pane slides in from the right showing every file
+   about to be written, where each lands in flash, and whether its checksum
+   matched — then *Flash to COM6*, pinned at the bottom of that pane. Builds
+   meant for another chip stay dimmed and say why, and firmforge refuses one
+   even if you force it.
+4. **Playground** → *Connect to COM6* (it already knows the board from the top
+   bar) → *Interrupt (Ctrl-C)*. The `>>>` prompt appears. Type
+   `print(2 ** 10)` and press Enter.
+5. Switch to the **Run a script** tab, paste a script and press *Run on board*.
+   Indentation survives, and an exception comes back as an error rather than
+   being lost in the output.
+6. Switch to **Files**, save it as `main.py` and press *Save and reboot*. It
+   now runs every time the board powers on.
 
 Steps 4 to 6 are what Thonny is normally installed for.
 
