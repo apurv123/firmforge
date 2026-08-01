@@ -120,8 +120,10 @@ bricked.
    and MAC from the silicon itself, and the top bar shows what you are plugged
    into from then on. *What is on this board?* tells you which firmware is
    already there before you overwrite it.
-3. **Flash** → *Install* on **MicroPython**, then *Flash*. Builds meant for
-   another chip stay dimmed, and firmforge refuses one even if you force it.
+3. **Flash** → pick **MicroPython** from the list. The review pane on the right
+   shows every file about to be written, where each lands in flash, and whether
+   its checksum matched — then *Flash to COM6*. Builds meant for another chip
+   stay dimmed and say why, and firmforge refuses one even if you force it.
 4. **Playground** → pick the same port → *Connect* → *Interrupt (Ctrl-C)*. The
    `>>>` prompt appears. Type `print(2 ** 10)` and press Enter.
 5. Paste a script into **Run a script** and press *Run on board*. Indentation

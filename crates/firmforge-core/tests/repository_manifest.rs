@@ -114,12 +114,12 @@ fn an_esp32_board_selects_the_esp32_build_not_the_s3_one() {
     assert_eq!(chosen.chip_family, "ESP32");
 }
 
-/// The demo device the app ships with must be able to install the example, or
-/// the out-of-the-box walkthrough is broken.
+/// A plausible ESP32-S3 must be able to install the example, or the convention
+/// documented in `firmware/README.md` is not actually usable.
 #[test]
-fn the_demo_device_can_install_the_example() {
+fn a_typical_esp32_s3_can_install_the_example() {
     let m = load();
-    let demo = DeviceIdentity {
+    let board = DeviceIdentity {
         chip_family: "ESP32-S3".into(),
         chip_revision: Some(0),
         flash_size: Some(8 * 1024 * 1024),
@@ -128,7 +128,6 @@ fn the_demo_device_can_install_the_example() {
         mac: None,
     };
 
-    let chosen =
-        matching::select_best(&m.builds, &demo).expect("the demo device must have a build");
+    let chosen = matching::select_best(&m.builds, &board).expect("an ESP32-S3 must have a build");
     assert_eq!(chosen.chip_family, "ESP32-S3");
 }

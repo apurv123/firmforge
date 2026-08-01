@@ -36,13 +36,6 @@ fn list_ports() -> Result<serde_json::Value, String> {
     serde_json::to_value(firmforge_app::list_serial_ports()).map_err(|e| e.to_string())
 }
 
-/// The simulated device, so the whole workflow can be exercised without
-/// hardware and without writing to anything.
-#[tauri::command]
-fn demo_device() -> Target {
-    flash::demo_target()
-}
-
 #[tauri::command]
 fn catalogue(
     manifest_json: String,
@@ -336,11 +329,7 @@ async fn detect_device(
     .map_err(|e| format!("device detection stopped unexpectedly: {e}"))?
     .map_err(|e| e.to_string())?;
 
-    Ok(Target {
-        port,
-        identity,
-        demo: false,
-    })
+    Ok(Target { port, identity })
 }
 
 /// What firmware is on the board *right now*, before anything is overwritten.
@@ -373,18 +362,15 @@ async fn identify_running(
 
 /// Run the install. Progress arrives on the `flash` event channel.
 ///
-/// `demo` writes nothing; it re-downloads, re-verifies and simulates the write
-/// so a manifest can be rehearsed end to end before real hardware is risked.
-/// When `demo` is false, `port` must name a connected device — the write is
-/// refused if the chip on that port disagrees with the build's `chipFamily`.
+/// `port` must name a connected device — the write is refused if the chip on
+/// that port disagrees with the build's `chipFamily`.
 #[tauri::command]
 async fn run_install(
     app: AppHandle,
     state: tauri::State<'_, ConsoleState>,
     discovered: DiscoveredManifest,
     build_index: usize,
-    demo: bool,
-    port: Option<String>,
+    port: String,
 ) -> Result<(), String> {
     let emit = {
         let app = app.clone();
@@ -393,27 +379,22 @@ async fn run_install(
         }
     };
 
-    let port = if demo {
-        None
-    } else {
-        let port = port.unwrap_or_default();
-        if port.is_empty() {
-            let message = "Choose the port your device is connected to first.".to_string();
-            emit(flash::FlashEvent::Failed {
-                message: message.clone(),
-            });
-            return Err(message);
-        }
-        // A port belongs to one program at a time. Taking it from the console
-        // here turns what would be an opaque "access denied" into something
-        // that just works, and says so.
-        if release_port(&state, &port) {
-            emit(flash::FlashEvent::Log {
-                line: format!("Closed the terminal on {port} so it can be flashed."),
-            });
-        }
-        Some(port)
-    };
+    if port.is_empty() {
+        let message = "Choose the port your device is connected to first.".to_string();
+        emit(flash::FlashEvent::Failed {
+            message: message.clone(),
+        });
+        return Err(message);
+    }
+
+    // A port belongs to one program at a time. Taking it from the console here
+    // turns what would be an opaque "access denied" into something that just
+    // works, and says so.
+    if release_port(&state, &port) {
+        emit(flash::FlashEvent::Log {
+            line: format!("Closed the terminal on {port} so it can be flashed."),
+        });
+    }
 
     let build = discovered
         .manifest
@@ -431,16 +412,10 @@ async fn run_install(
         }
     };
 
-    match port {
-        // Everything is downloaded and checksummed before this point, so the
-        // window in which a failure can leave the board half-written is as
-        // narrow as the write itself.
-        Some(port) => flash::run_serial(&port, &build.chip_family, &prepared, emit).await,
-        None => {
-            flash::run_demo(&prepared, emit).await;
-            Ok(())
-        }
-    }
+    // Everything is downloaded and checksummed before this point, so the window
+    // in which a failure can leave the board half-written is as narrow as the
+    // write itself.
+    flash::run_serial(&port, &build.chip_family, &prepared, emit).await
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -449,7 +424,6 @@ pub fn run() {
         .manage(ConsoleState::default())
         .invoke_handler(tauri::generate_handler![
             list_ports,
-            demo_device,
             catalogue,
             catalogue_for,
             add_source,
