@@ -60,12 +60,10 @@ produced by CI — see [Installing and testing](#installing-and-testing).
   mismatch refuses the install rather than warning
 - See exactly where each byte comes from, and whether it is the publisher's own
   release asset or a rehosted copy
-- Run the whole thing against a **demo device**, so the workflow can be tried
-  without owning an ESP32 and without writing to anything
 - **Flash a real ESP32** over USB: firmforge identifies the chip by talking to
   its ROM bootloader, refuses any build meant for a different chip, writes each
   part, and reads it back to confirm what landed
-- **Talk to the board afterwards.** The Terminal screen is a real serial
+- **Talk to the board afterwards.** The Playground screen is a real serial
   console: watch output, type at the prompt, interrupt a running program with
   Ctrl-C, soft reboot with Ctrl-D. On MicroPython it also runs scripts and
   saves files to the board — name one `main.py` and it runs on every power-up.
@@ -107,42 +105,34 @@ bricked.
 
 ## Installing and testing
 
-> **What you get today:** the full workflow — pick a chip, browse firmware that
-> is already there, download and verify it, then either rehearse the write
-> against a demo device or flash a real ESP32 over USB.
-
-### Try it in five clicks
-
-1. Install a build (below) and open firmforge.
-2. **Chip** → *ESP32-S3*. ESPHome, MicroPython, WLED and Tasmota load on their own.
-3. **Sources** → *Also available* → *Add* on **ESP32 Marauder**.
-4. **Device** → *Use demo device*, or plug a board in and use
-   *Detect connected devices* → *Identify this device*. Then **Catalogue** →
-   *Install* on the ESP32-S3 Marauder build. The ESP32 build beside it stays
-   dimmed, and tells you why.
-5. **Install** → check the parts table, then *Flash*, and watch the
-   **Console**.
-
-That downloads ~1.5 MB of real ESP32 Marauder firmware from Marauder's own
-release page, verifies all four SHA-256 digests, and simulates the write.
-Nothing is written to any hardware.
+> **What you get today:** the full workflow — connect a board, browse firmware
+> that is already there, download and verify it, flash it over USB, then talk to
+> it. Three screens: **Device**, **Flash**, **Playground**.
 
 ### With a real board: firmware, then Python, without leaving the app
 
-1. **Chip** → *ESP32-S3*, then **Device** → *Detect connected devices* →
-   *Identify this device*. firmforge reads the chip, revision, flash size and
-   MAC from the silicon itself.
-2. **Catalogue** → *Install* on **MicroPython**, then *Flash*. Builds meant for
+1. Install a build (below) and open firmforge. On a fresh install it asks once
+   which chip you have — *ESP32-S3*. ESPHome, MicroPython, WLED and Tasmota load
+   on their own. After that the chip lives in the top bar.
+2. **Device** → *Detect connected devices* → *Identify this device*. firmforge
+   reads the chip, revision, flash size and MAC from the silicon itself, and the
+   top bar shows what you are plugged into from then on.
+3. **Flash** → *Install* on **MicroPython**, then *Flash*. Builds meant for
    another chip stay dimmed, and firmforge refuses one even if you force it.
-3. **Terminal** → pick the same port → *Connect* → *Interrupt (Ctrl-C)*. The
+4. **Playground** → pick the same port → *Connect* → *Interrupt (Ctrl-C)*. The
    `>>>` prompt appears. Type `print(2 ** 10)` and press Enter.
-4. Paste a script into **Run a script** and press *Run on board*. Indentation
+5. Paste a script into **Run a script** and press *Run on board*. Indentation
    survives, and an exception comes back as an error rather than being lost in
    the output.
-5. Put it in **Put a file on the board** as `main.py` and press *Save and
+6. Put it in **Put a file on the board** as `main.py` and press *Save and
    reboot*. It now runs every time the board powers on.
 
-Steps 3 to 5 are what Thonny is normally installed for.
+Steps 4 to 6 are what Thonny is normally installed for.
+
+**Settings** (top right) is where firmware sources live — add ESP32 Marauder
+there from *Also available* and it appears in **Flash** alongside the rest.
+**Activity** opens a log of everything firmforge did, over whatever screen you
+are on.
 
 ### Option A — install a prebuilt binary (no toolchain needed)
 

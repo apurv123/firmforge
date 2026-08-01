@@ -14,16 +14,49 @@
       body {
         margin: 0; background: var(--bg); color: var(--text);
         font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-        display: grid; grid-template-columns: 230px 1fr; height: 100vh;
+        display: grid; height: 100vh;
+        grid-template-columns: 230px 1fr; grid-template-rows: auto 1fr;
+        grid-template-areas: "top top" "nav main";
       }
-      nav { background: var(--panel); border-right: 1px solid var(--line); padding: 18px 12px; display: flex; flex-direction: column; }
-      .brand { font-weight: 700; letter-spacing: .04em; padding: 4px 10px 18px; }
+
+      /* The top bar is the one place that answers "what am I talking to".
+         Chip family and the board live here rather than on a screen, because
+         both are needed from every screen and neither is a destination. */
+      .topbar {
+        grid-area: top; background: var(--panel); border-bottom: 1px solid var(--line);
+        display: flex; align-items: center; gap: 10px; padding: 0 16px; height: 54px;
+      }
+      .brand { font-weight: 700; letter-spacing: .04em; margin-right: 8px; }
       .brand span { color: var(--accent); }
+      .pill {
+        background: var(--raised); border: 1px solid var(--line); color: var(--text);
+        border-radius: 999px; padding: 7px 13px; font: inherit; font-size: 12.5px;
+        cursor: pointer; display: flex; align-items: center; gap: 8px; white-space: nowrap;
+      }
+      .pill:hover { border-color: #333b4d; }
+      .pill .caret, .pill .label { color: var(--muted); }
+      .pill.quiet { background: transparent; border-color: transparent; color: var(--muted); }
+      .pill.quiet:hover { background: var(--raised); }
+      .topbar .spacer { flex: 1; }
+
+      nav { grid-area: nav; background: var(--panel); border-right: 1px solid var(--line); padding: 14px 12px; display: flex; flex-direction: column; gap: 2px; }
       nav a { display: block; padding: 9px 10px; border-radius: 8px; color: var(--muted); text-decoration: none; cursor: pointer; }
       nav a[aria-current="page"] { background: var(--raised); color: var(--text); }
-      .device-chip { margin-top: auto; border: 1px solid var(--line); border-radius: 10px; padding: 10px; color: var(--muted); font-size: 12px; }
-      .device-chip b { color: var(--text); font-weight: 600; }
-      main { padding: 26px 30px; overflow: auto; }
+      nav .navnote { margin-top: auto; color: var(--muted); font-size: 11.5px; padding: 10px; }
+      main { grid-area: main; padding: 26px 30px; overflow: auto; }
+
+      /* Activity is a drawer, not a destination: you want the log next to the
+         thing that confused you, not instead of it. */
+      #activity {
+        position: fixed; left: 0; right: 0; bottom: 0; height: 42vh; z-index: 20;
+        background: var(--panel); border-top: 1px solid var(--line);
+        display: flex; flex-direction: column; padding: 12px 16px 16px;
+        box-shadow: 0 -14px 34px rgba(0,0,0,.42);
+      }
+      #activity[hidden] { display: none; }
+      .drawerhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+      .drawerhead b { font-size: 13px; }
+      #activity pre { flex: 1; max-height: none; margin-top: 8px; }
       h1 { font-size: 20px; margin: 0 0 4px; }
       p.sub { color: var(--muted); margin: 0 0 22px; }
       section[hidden] { display: none; }
@@ -114,28 +147,40 @@
     </style>
   </head>
   <body>
-    <nav>
+    <header class="topbar">
       <div class="brand">firm<span>forge</span></div>
-      <a data-screen="chips" aria-current="page">Chip</a>
-      <a data-screen="sources">Sources</a>
-      <a data-screen="catalogue">Catalogue</a>
-      <a data-screen="device">Device</a>
-      <a data-screen="install">Install</a>
-      <a data-screen="terminal">Terminal</a>
-      <a data-screen="console">Console</a>
-      <div class="device-chip" id="chip">No device selected</div>
+      <button class="pill" id="chipPill" title="Which chip you are working with">
+        <span class="label">Chip</span><span id="chipPillValue">Not chosen</span><span class="caret">▾</span>
+      </button>
+      <button class="pill" id="devicePill" title="The board firmforge is talking to">
+        <span class="dot" id="devicePillDot"></span><span id="devicePillValue">No device</span>
+      </button>
+      <div class="spacer"></div>
+      <button class="pill quiet" id="activityToggle">Activity</button>
+      <button class="pill quiet" id="settingsBtn">Settings</button>
+    </header>
+
+    <nav>
+      <a data-screen="device" aria-current="page">Device</a>
+      <a data-screen="catalogue">Flash</a>
+      <a data-screen="terminal">Playground</a>
+      <div class="navnote">Connect a board, put firmware on it, then try it out.</div>
     </nav>
 
     <main>
       <section id="screen-chips">
         <h1>Which chip are you working with?</h1>
-        <p class="sub">Everything else follows from this: which firmware is shown, where each file lands in flash, and how the board is talked to. You can change it at any time.</p>
+        <p class="sub">Everything else follows from this: which firmware is shown, where each file lands in flash, and how the board is talked to. Asked once — after that it lives in the top bar.</p>
         <div id="familyList"></div>
       </section>
 
       <section id="screen-sources" hidden>
-        <h1>Firmware sources</h1>
-        <p class="sub">firmforge starts with a few well-known publishers so it is useful immediately. Add your own by pasting a GitHub repository or a link to a published <code>manifest.json</code>.</p>
+        <h1>Settings · firmware sources</h1>
+        <p class="sub">Where firmforge looks for firmware. Set once and forgotten — it starts with a few well-known publishers so it is useful immediately. Add your own by pasting a GitHub repository or a link to a published <code>manifest.json</code>.</p>
+
+        <div class="row" style="margin-bottom:16px">
+          <button class="ghost small" id="sourcesDone">← Back to the device</button>
+        </div>
 
         <div class="row">
           <input type="text" id="repo" placeholder="owner/repo, or https://…/manifest.json" />
@@ -157,11 +202,10 @@
 
       <section id="screen-device" hidden>
         <h1>Device</h1>
-        <p class="sub">Choose real hardware, or the demo device to try the whole workflow safely.</p>
+        <p class="sub">Plug a board in over USB and identify it. Everything else — which firmware is offered, where it lands in flash — follows from what the chip reports about itself.</p>
 
         <div class="row">
           <button id="detect">Detect connected devices</button>
-          <button class="ghost" id="useDemo">Use demo device</button>
         </div>
         <div id="deviceInfo"></div>
       </section>
@@ -237,12 +281,16 @@
         </div>
       </section>
 
-      <section id="screen-console" hidden>
-        <h1>Console</h1>
-        <p class="sub">Everything firmforge did, in order.</p>
-        <pre id="log">Ready.</pre>
-      </section>
     </main>
+
+    <aside id="activity" hidden>
+      <div class="drawerhead">
+        <b>Activity</b>
+        <button class="ghost small" id="activityClose">Close</button>
+      </div>
+      <div class="meta">Everything firmforge did, in order.</div>
+      <pre id="log">Ready.</pre>
+    </aside>
 
     <script>
       const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
@@ -272,14 +320,45 @@
         el.scrollTop = el.scrollHeight;
       }
 
+      // Seven screens became three destinations. The rest are still screens —
+      // they are just reached from the top bar or from a selection, because
+      // they are either rare (chip), a preference (sources), or a step inside
+      // something you are already doing (install).
+      const SCREENS = ["chips", "sources", "catalogue", "device", "install", "terminal"];
+      const NAV_FOR = { install: "catalogue" };
+
       document.querySelectorAll("nav a").forEach((a) => {
         a.addEventListener("click", () => show(a.dataset.screen));
       });
-      const SCREENS = ["chips", "sources", "catalogue", "device", "install", "terminal", "console"];
+
       function show(name) {
+        const active = NAV_FOR[name] || name;
         document.querySelectorAll("nav a").forEach((a) =>
-          a.setAttribute("aria-current", a.dataset.screen === name ? "page" : "false"));
+          a.setAttribute("aria-current", a.dataset.screen === active ? "page" : "false"));
         SCREENS.forEach((s) => { $("screen-" + s).hidden = s !== name; });
+        document.querySelector("main").scrollTop = 0;
+      }
+
+      // ── top bar ────────────────────────────────────────────────
+      $("chipPill").addEventListener("click", () => show("chips"));
+      $("devicePill").addEventListener("click", () => show("device"));
+      $("settingsBtn").addEventListener("click", () => show("sources"));
+      $("sourcesDone").addEventListener("click", () => show("device"));
+      $("activityToggle").addEventListener("click", () => toggleActivity());
+      $("activityClose").addEventListener("click", () => toggleActivity(false));
+
+      function toggleActivity(force) {
+        const el = $("activity");
+        const open = force === undefined ? el.hidden : force;
+        el.hidden = !open;
+        if (open) { const l = $("log"); l.scrollTop = l.scrollHeight; }
+      }
+
+      function renderTopBar() {
+        $("chipPillValue").textContent = state.family || "Not chosen";
+        const d = state.device;
+        $("devicePillValue").textContent = d ? d.identity.chipFamily + " · " + d.port : "No device";
+        $("devicePillDot").style.background = d ? "var(--ok)" : "#3a4050";
       }
 
       const save = () => localStorage.setItem("discovered", JSON.stringify(state.discovered));
@@ -314,14 +393,16 @@
       }
 
       async function chooseFamily(id) {
-        const first = !state.family;
         state.family = id;
         localStorage.setItem("family", id);
         log("Chip family set to " + id + ".");
+        renderTopBar();
         renderFamilies();
         renderSources();
         renderCatalogue();
-        if (first) show("sources");
+        // Asked once on a fresh install, then never again — afterwards it is a
+        // control in the top bar. Either way you land on the loop.
+        show("device");
       }
 
       function familyMatches(value) {
@@ -505,13 +586,6 @@
       }
 
       // ── device ─────────────────────────────────────────────────
-      $("useDemo").addEventListener("click", async () => {
-        state.device = await invoke("demo_device");
-        log("Selected the demo device (ESP32-S3, 8 MB flash). Nothing will be written.");
-        renderDevice();
-        renderCatalogue();
-      });
-
       $("detect").addEventListener("click", async () => {
         const btn = $("detect");
         btn.disabled = true;
@@ -519,7 +593,7 @@
           const ports = await invoke("list_ports");
           log("Found " + ports.length + " serial port(s).");
           if (!ports.length) {
-            $("deviceInfo").innerHTML = '<div class="empty">No serial ports found. Plug in a board, or use the demo device.</div>';
+            $("deviceInfo").innerHTML = '<div class="empty">No serial ports found. Check the cable is a data cable, not power-only.</div>';
             return;
           }
           $("deviceInfo").innerHTML = ports.map((p) =>
@@ -565,20 +639,23 @@
 
       function renderDevice() {
         const d = state.device;
+        renderTopBar();
         if (!d) return;
         const i = d.identity;
-        $("chip").innerHTML = "<b>" + esc(i.chipFamily) + "</b><br>" + esc(d.port) + (d.demo ? " · demo" : "");
         $("deviceInfo").innerHTML =
           '<div class="card"><div class="cardhead"><div>' +
             "<h3>" + esc(i.chipFamily) + (i.chipRevision != null ? " rev v" + esc(i.chipRevision) : "") + "</h3>" +
             '<div class="meta">' + esc(d.port) + " · " + kb(i.flashSize) + " flash · " +
               (i.hasPsram ? "PSRAM" : "no PSRAM") + " · " + esc(i.serialType) +
               (i.mac ? " · " + esc(i.mac) : "") + "</div>" +
-          "</div>" + (d.demo ? '<span class="tag warn">Demo</span>' : '<span class="tag ok">Connected</span>') + "</div>" +
-          (d.demo
-            ? '<p class="meta" style="margin-top:10px">A simulated ESP32-S3. Firmware is really downloaded and really verified; only the write to hardware is simulated.</p>'
-            : '<p class="meta" style="margin-top:10px">Read from the chip itself. firmforge refuses to write a build made for a different chip.</p>') +
-          "</div>";
+          "</div>" + '<span class="tag ok">Connected</span>' + "</div>" +
+          '<p class="meta" style="margin-top:10px">Read from the chip itself. firmforge refuses to write a build made for a different chip.</p>' +
+          '<div class="tags" style="margin-top:14px">' +
+            '<button class="small" id="goFlash">Flash firmware</button>' +
+            '<button class="small ghost" id="goPlay">Open playground</button>' +
+          "</div></div>";
+        $("goFlash").addEventListener("click", () => show("catalogue"));
+        $("goPlay").addEventListener("click", () => show("terminal"));
       }
 
       // ── catalogue ──────────────────────────────────────────────
@@ -672,7 +749,7 @@
             '<div class="meta">' + esc(plan.chipFamily) + " · " + kb(plan.totalBytes) +
               " · onto " + esc(state.device ? state.device.port : "no device") + "</div>" +
           '</div><button id="go"' + (state.device ? "" : " disabled") + ">" +
-            (state.device && state.device.demo ? "Run demo install" : "Flash") + "</button></div>" +
+            "Flash" + "</button></div>" +
           (plan.fullyVerified
             ? '<div class="tags"><span class="tag ok">Every part checksum-verified</span></div>'
             : '<div class="tags"><span class="tag warn">Some parts have no checksum in the manifest</span></div>') +
@@ -685,21 +762,18 @@
 
       async function runInstall() {
         const sel = state.selection;
-        const demo = !!state.device.demo;
-        if (!demo) {
-          const ok = confirm(
-            "This will overwrite the firmware on " + state.device.port + " (" +
-            state.device.identity.chipFamily + ").\n\n" +
-            "Keep the board plugged in until it finishes. Continue?");
-          if (!ok) return;
-        }
+        const ok = confirm(
+          "This will overwrite the firmware on " + state.device.port + " (" +
+          state.device.identity.chipFamily + ").\n\n" +
+          "Keep the board plugged in until it finishes. Continue?");
+        if (!ok) return;
         $("go").disabled = true;
         try {
           await invoke("run_install", {
             discovered: sel.discovered,
             buildIndex: sel.buildIndex,
-            demo: demo,
-            port: demo ? null : state.device.port,
+            demo: false,
+            port: state.device.port,
           });
         } catch (e) {
           $("progressText").textContent = String(e);
@@ -767,7 +841,7 @@
                 (p.product ? " — " + esc(p.product) : "") + "</option>").join("")
             : '<option value="">No ports found</option>';
           if (previous && ports.some((p) => p.portName === previous)) sel.value = previous;
-          else if (state.device && !state.device.demo &&
+          else if (state.device &&
                    ports.some((p) => p.portName === state.device.port)) {
             sel.value = state.device.port;
           }
@@ -1043,12 +1117,15 @@
 
       async function start() {
         log("firmforge ready.");
+        renderTopBar();
         await renderFamilies();
         if (state.family) {
-          // Returning user: go straight to what they came for.
-          show("sources");
+          // Returning user: straight into the loop, on the screen that tells
+          // you what you are plugged into.
+          show("device");
           log("Chip family: " + state.family + ".");
         } else {
+          show("chips");
           log("First run — choose a chip family to begin.");
         }
         renderSources();
