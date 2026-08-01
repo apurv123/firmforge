@@ -17,7 +17,7 @@ use firmforge_core::{
 };
 use serde::{Deserialize, Serialize};
 
-pub use flash::{demo_target, FlashEvent, Target};
+pub use flash::{FlashEvent, Target};
 pub use github::{discover, DiscoveredManifest, Source};
 pub use install::{prepare, PartSummary, Prepared};
 pub use sources::{load_builtin, load_builtins, load_bundled, SourceStatus};

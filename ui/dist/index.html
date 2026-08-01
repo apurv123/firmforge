@@ -145,6 +145,27 @@
       .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #3a4050; }
       .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
       @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
+
+      /* Browse on the left, commit on the right. The review pane is deliberately
+         separate: overwriting a board is the one irreversible thing this app
+         does, and it should not be an inline button in a list. */
+      .flashsplit { display: grid; grid-template-columns: 1fr 380px; gap: 20px; align-items: start; }
+      @media (max-width: 1100px) { .flashsplit { grid-template-columns: 1fr; } }
+      .review {
+        position: sticky; top: 0; background: var(--panel);
+        border: 1px solid var(--line); border-radius: 12px; padding: 16px;
+      }
+      .review h3 { margin: 0 0 2px; font-size: 15px; }
+      .review .danger {
+        border: 1px solid #5a2226; background: #2a1416; color: #ffc9cc;
+        border-radius: 8px; padding: 9px 11px; font-size: 12.5px; margin: 12px 0;
+      }
+      .review table { font-size: 12px; }
+      .review td.url { max-width: 150px; }
+      .review button { width: 100%; margin-top: 4px; }
+      .parts { max-height: 220px; overflow: auto; }
+      .stepline { color: var(--muted); font-size: 11.5px; letter-spacing: .06em;
+                  text-transform: uppercase; margin-bottom: 8px; }
     </style>
   </head>
   <body>
@@ -163,7 +184,7 @@
 
     <nav>
       <a data-screen="device" aria-current="page">Device</a>
-      <a data-screen="catalogue">Flash</a>
+      <a data-screen="flash">Flash</a>
       <a data-screen="terminal">Playground</a>
       <div class="navnote">Connect a board, put firmware on it, then try it out.</div>
     </nav>
@@ -195,10 +216,20 @@
         <div id="sourceList"></div>
       </section>
 
-      <section id="screen-catalogue" hidden>
-        <h1>Catalogue</h1>
-        <p class="sub" id="catalogueSub">Firmware from your sources, checked against the selected device.</p>
-        <div id="catalogueList"></div>
+      <section id="screen-flash" hidden>
+        <h1>Flash</h1>
+        <p class="sub" id="catalogueSub">Firmware from your sources, checked against the connected device.</p>
+
+        <div class="flashsplit">
+          <div>
+            <div class="row">
+              <input type="text" id="fwSearch" placeholder="Search firmware…" autocomplete="off" spellcheck="false" />
+            </div>
+            <div id="catalogueList"></div>
+          </div>
+
+          <aside id="reviewPane" class="review"></aside>
+        </div>
       </section>
 
       <section id="screen-device" hidden>
@@ -215,16 +246,8 @@
         <div id="portList"></div>
       </section>
 
-      <section id="screen-install" hidden>
-        <h1>Install</h1>
-        <p class="sub" id="installSub">Pick a firmware from the catalogue first.</p>
-        <div id="installBody"></div>
-        <div class="bar"><div id="progress"></div></div>
-        <div class="meta" id="progressText">Idle.</div>
-      </section>
-
       <section id="screen-terminal" hidden>
-        <h1>Terminal</h1>
+        <h1>Playground</h1>
         <p class="sub">Talk to a board that is already running. For MicroPython this is the <code>&gt;&gt;&gt;</code> prompt — the same thing Thonny gives you, without leaving firmforge.</p>
 
         <div class="row">
@@ -313,7 +336,11 @@
         device: null,
         ports: [],
         running: null,
+        entries: [],
         selection: null,
+        plan: null,
+        phase: "idle",
+        percent: 0,
       };
 
       const $ = (id) => document.getElementById(id);
@@ -331,8 +358,8 @@
       // they are just reached from the top bar or from a selection, because
       // they are either rare (chip), a preference (sources), or a step inside
       // something you are already doing (install).
-      const SCREENS = ["chips", "sources", "catalogue", "device", "install", "terminal"];
-      const NAV_FOR = { install: "catalogue" };
+      const SCREENS = ["chips", "sources", "flash", "device", "terminal"];
+      const NAV_FOR = {};
 
       document.querySelectorAll("nav a").forEach((a) => {
         a.addEventListener("click", () => show(a.dataset.screen));
@@ -710,7 +737,7 @@
             '<button class="small" id="goFlash">Flash firmware</button>' +
             '<button class="small ghost" id="goPlay">Open playground</button>' +
           "</div></div>";
-        $("goFlash").addEventListener("click", () => show("catalogue"));
+        $("goFlash").addEventListener("click", () => show("flash"));
         $("goPlay").addEventListener("click", () => show("terminal"));
         renderRunning();
       }
@@ -770,16 +797,20 @@
         renderRunning();
       }
 
-      // ── catalogue ──────────────────────────────────────────────
+      // ── flash ──────────────────────────────────────────────────
+      // Browse on the left, commit on the right. One screen, because picking
+      // firmware and deciding to write it are the same decision.
+      $("fwSearch").addEventListener("input", () => renderEntries());
+
       async function renderCatalogue() {
-        const host = $("catalogueList");
         const manifests = allManifests();
         $("catalogueSub").textContent = state.family
           ? "Firmware for " + state.family + ", from your sources."
           : "Firmware from your sources.";
 
         if (!manifests.length) {
-          host.innerHTML = '<div class="empty">Nothing to show yet — check the Sources screen.</div>';
+          state.entries = [];
+          renderEntries();
           return;
         }
         const all = await invoke("catalogue_for", {
@@ -787,22 +818,42 @@
           device: state.device ? state.device.identity : null,
         });
 
-        // Filtered by chip family rather than by device, so the catalogue is
-        // useful before anything is plugged in.
-        const entries = all.filter((e) => familyMatches(e.chipFamily));
+        // Filtered by chip family rather than by device, so the list is useful
+        // before anything is plugged in.
+        state.entries = all.filter((e) => familyMatches(e.chipFamily));
+        renderEntries();
+      }
 
-        host.innerHTML = state.device ? "" :
-          '<div class="banner info">No device selected, so compatibility is not being checked in detail. Pick a device to see what actually fits.</div>';
+      function renderEntries() {
+        const host = $("catalogueList");
+        const all = state.entries || [];
+        const q = ($("fwSearch").value || "").trim().toLowerCase();
+        const entries = q
+          ? all.filter((e) => (e.name + " " + e.version + " " + (e.variant || "") + " " +
+              e.source + " " + e.capabilities.join(" ")).toLowerCase().includes(q))
+          : all;
 
-        if (!entries.length) {
-          host.insertAdjacentHTML("beforeend",
-            '<div class="empty">None of your sources publish a ' + esc(state.family || "matching") +
-            " build. Try another chip family, or add a source.</div>");
+        if (!allManifests().length) {
+          host.innerHTML = '<div class="empty">No firmware sources yet — add some under Settings.</div>';
+          renderReview();
           return;
         }
 
-        entries.forEach((e, index) => {
+        host.innerHTML = state.device ? "" :
+          '<div class="banner info">Nothing is connected, so compatibility is only being checked against the chip family. Identify a device to see what actually fits.</div>';
+
+        if (!entries.length) {
+          host.insertAdjacentHTML("beforeend", q
+            ? '<div class="empty">Nothing matches “' + esc(q) + "”.</div>"
+            : '<div class="empty">None of your sources publish a ' + esc(state.family || "matching") +
+              " build. Try another chip family, or add a source under Settings.</div>");
+          renderReview();
+          return;
+        }
+
+        entries.forEach((e) => {
           const compatible = e.compatibility.compatible;
+          const chosen = state.selection && state.selection.key === entryKey(e);
           const tags = ['<span class="tag">' + esc(e.chipFamily) + "</span>",
             '<span class="tag">' + esc(e.channel) + "</span>",
             e.verified ? '<span class="tag ok">Signed</span>' : '<span class="tag warn">Unsigned</span>']
@@ -812,64 +863,149 @@
             '<div class="card ' + (compatible ? "" : "dim") + '"><div class="cardhead"><div>' +
               "<h3>" + esc(e.name) + " " + esc(e.version) + (e.variant ? " · " + esc(e.variant) : "") + "</h3>" +
               '<div class="meta">' + esc(e.source) + " · " + esc(e.provenance) + " · " + e.partCount + " part(s)</div>" +
-            '</div><button class="small" data-install="' + index + '"' + (compatible ? "" : " disabled") + ">Install</button></div>" +
+            '</div><button class="small' + (chosen ? " ghost" : "") + '" data-pick="' + esc(entryKey(e)) + '"' +
+              (compatible ? "" : " disabled") + ">" + (chosen ? "Selected" : "Review") + "</button></div>" +
             '<div class="tags">' + tags + "</div>" +
             (compatible ? "" : '<ul class="reasons">' + e.reasons.map((r) => "<li>" + esc(r) + "</li>").join("") + "</ul>") +
             "</div>");
         });
 
-        host.querySelectorAll("[data-install]").forEach((b) =>
-          b.addEventListener("click", () => choose(entries[+b.dataset.install])));
+        host.querySelectorAll("[data-pick]").forEach((b) =>
+          b.addEventListener("click", () => choose(entries.find((e) => entryKey(e) === b.dataset.pick))));
+
+        renderReview();
       }
 
-      // ── install ────────────────────────────────────────────────
+      const entryKey = (e) => e.source + "|" + e.manifestUrl + "|" + e.buildIndex;
+
       async function choose(entry) {
+        if (!entry) return;
         const discovered = allManifests().find(
           (d) => d.source === entry.source && d.manifestUrl === entry.manifestUrl);
         if (!discovered) return;
 
-        state.selection = { discovered: discovered, buildIndex: entry.buildIndex };
-        show("install");
-        $("installSub").textContent =
-          entry.name + " " + entry.version + " — downloading and verifying before anything is written.";
-        $("installBody").innerHTML = '<div class="banner info">Downloading and checking every part…</div>';
+        state.selection = {
+          key: entryKey(entry), entry: entry,
+          discovered: discovered, buildIndex: entry.buildIndex,
+        };
+        state.phase = "preparing";
+        state.plan = null;
+        renderEntries();
         log("Preparing " + entry.name + " " + entry.version + " from " + entry.source + ".");
 
         try {
           const plan = await invoke("prepare_install", {
             discovered: discovered, buildIndex: entry.buildIndex,
           });
-          renderPlan(plan);
+          // A newer selection may have landed while this was downloading.
+          if (!state.selection || state.selection.key !== entryKey(entry)) return;
+          state.plan = plan;
+          state.phase = "ready";
           log("Prepared " + kb(plan.totalBytes) + " across " + plan.parts.length + " part(s).");
         } catch (e) {
-          $("installBody").innerHTML = '<div class="banner bad">' + esc(e) + "</div>";
+          if (!state.selection || state.selection.key !== entryKey(entry)) return;
+          state.phase = "error";
+          state.error = String(e);
           log("Preparation failed: " + e);
         }
+        renderReview();
       }
 
-      function renderPlan(plan) {
+      // The review pane carries the whole commit half of this screen: what is
+      // about to be written, where it came from, and the one button that does
+      // something irreversible.
+      function renderReview() {
+        const host = $("reviewPane");
+        const sel = state.selection;
+
+        if (!sel) {
+          host.innerHTML = '<div class="stepline">Review</div>' +
+            '<div class="meta">Pick firmware on the left and everything about to be written shows up here — ' +
+            "each file, where it lands in flash, and whether its checksum matched — before anything happens.</div>";
+          return;
+        }
+
+        if (state.phase === "preparing") {
+          host.innerHTML = '<div class="stepline">Review</div>' +
+            "<h3>" + esc(sel.entry.name) + " " + esc(sel.entry.version) + "</h3>" +
+            '<div class="meta" style="margin-top:8px">Downloading every part and checking its SHA-256. Nothing is written yet.</div>' +
+            '<div class="bar"><div style="width:35%"></div></div>';
+          return;
+        }
+
+        if (state.phase === "error") {
+          host.innerHTML = '<div class="stepline">Review</div>' +
+            "<h3>" + esc(sel.entry.name) + "</h3>" +
+            '<div class="danger" style="margin-top:10px">' + esc(state.error) + "</div>" +
+            '<div class="meta">Nothing was written. This failed before the board was touched.</div>';
+          return;
+        }
+
+        if (state.phase === "flashing" || state.phase === "done" || state.phase === "failed") {
+          renderProgress();
+          return;
+        }
+
+        const plan = state.plan;
+        if (!plan) { host.innerHTML = ""; return; }
+
         const rows = plan.parts.map((p) =>
           '<tr><td class="num">' + esc(p.offset) + "</td>" +
           '<td class="num">' + kb(p.sizeBytes) + "</td>" +
-          "<td>" + (p.verified ? '<span class="tag ok">SHA-256 ok</span>' : '<span class="tag warn">No checksum</span>') + "</td>" +
-          '<td><span class="tag">' + (p.upstream ? "Upstream" : "Rehosted") + "</span></td>" +
-          '<td class="url meta">' + esc(p.url) + "</td></tr>").join("");
+          "<td>" + (p.verified ? '<span class="tag ok">sha ok</span>' : '<span class="tag warn">no sum</span>') + "</td>" +
+          '<td><span class="tag">' + (p.upstream ? "upstream" : "rehosted") + "</span></td></tr>").join("");
 
-        $("installBody").innerHTML =
-          '<div class="card"><div class="cardhead"><div>' +
-            "<h3>" + esc(plan.name) + " " + esc(plan.version) + "</h3>" +
-            '<div class="meta">' + esc(plan.chipFamily) + " · " + kb(plan.totalBytes) +
-              " · onto " + esc(state.device ? state.device.port : "no device") + "</div>" +
-          '</div><button id="go"' + (state.device ? "" : " disabled") + ">" +
-            "Flash" + "</button></div>" +
-          (plan.fullyVerified
-            ? '<div class="tags"><span class="tag ok">Every part checksum-verified</span></div>'
-            : '<div class="tags"><span class="tag warn">Some parts have no checksum in the manifest</span></div>') +
-          "<table><thead><tr><th>Offset</th><th>Size</th><th>Integrity</th><th>Origin</th><th>Source</th></tr></thead>" +
-          "<tbody>" + rows + "</tbody></table></div>";
+        host.innerHTML =
+          '<div class="stepline">Review</div>' +
+          "<h3>" + esc(plan.name) + " " + esc(plan.version) + "</h3>" +
+          '<div class="meta">' + esc(plan.chipFamily) + " · " + kb(plan.totalBytes) +
+            " · " + plan.parts.length + " part(s)</div>" +
+          '<div class="tags" style="margin-top:10px">' +
+            (plan.fullyVerified
+              ? '<span class="tag ok">Every part checksum-verified</span>'
+              : '<span class="tag warn">Some parts have no checksum</span>') +
+            (plan.allUpstream ? '<span class="tag">Straight from the publisher</span>' : "") +
+          "</div>" +
+          '<div class="parts"><table><thead><tr><th>At</th><th>Size</th><th>Integrity</th><th>Origin</th></tr></thead>' +
+          "<tbody>" + rows + "</tbody></table></div>" +
+          (state.device
+            ? '<div class="danger">Overwrites everything on ' + esc(state.device.port) + " (" +
+                esc(state.device.identity.chipFamily) + "). This cannot be undone, and the board must stay " +
+                "plugged in until it finishes.</div>" +
+              '<button id="go">Flash to ' + esc(state.device.port) + "</button>"
+            : '<div class="meta" style="margin-top:12px">No device connected. ' +
+              '<a href="#" id="toDevice">Connect one</a> and this becomes a Flash button.</div>');
 
-        const go = $("go");
-        if (go) go.addEventListener("click", runInstall);
+        if ($("go")) $("go").addEventListener("click", runInstall);
+        if ($("toDevice")) $("toDevice").addEventListener("click", (ev) => { ev.preventDefault(); show("device"); });
+      }
+
+      function renderProgress() {
+        const host = $("reviewPane");
+        const sel = state.selection;
+        // A late event can arrive after the user has moved on; there is nothing
+        // meaningful to draw at that point.
+        if (!sel) return;
+        const done = state.phase === "done";
+        const failed = state.phase === "failed";
+
+        host.innerHTML =
+          '<div class="stepline">' + (done ? "Done" : failed ? "Failed" : "Writing") + "</div>" +
+          "<h3>" + esc(sel.entry.name) + " " + esc(sel.entry.version) + "</h3>" +
+          '<div class="bar"><div id="progress" style="width:' + (state.percent || 0) + '%"></div></div>' +
+          '<div class="meta" id="progressText">' + esc(state.progressText || "Starting…") + "</div>" +
+          (done
+            ? '<div class="tags" style="margin-top:14px">' +
+                '<button class="small" id="afterPlay">Open playground</button>' +
+                '<button class="small ghost" id="afterMore">Flash something else</button></div>'
+            : failed
+              ? '<div class="tags" style="margin-top:14px"><button class="small ghost" id="afterMore">Back to the list</button></div>'
+              : '<div class="meta" style="margin-top:10px">Leave the board plugged in. Progress is also in Activity.</div>');
+
+        if ($("afterPlay")) $("afterPlay").addEventListener("click", () => show("terminal"));
+        if ($("afterMore")) $("afterMore").addEventListener("click", () => {
+          state.phase = "idle"; state.selection = null; state.plan = null; renderEntries();
+        });
       }
 
       async function runInstall() {
@@ -879,19 +1015,22 @@
           state.device.identity.chipFamily + ").\n\n" +
           "Keep the board plugged in until it finishes. Continue?");
         if (!ok) return;
-        $("go").disabled = true;
+
+        state.phase = "flashing";
+        state.percent = 0;
+        state.progressText = "Starting…";
+        renderProgress();
         try {
           await invoke("run_install", {
             discovered: sel.discovered,
             buildIndex: sel.buildIndex,
-            demo: false,
             port: state.device.port,
           });
         } catch (e) {
-          $("progressText").textContent = String(e);
+          state.phase = "failed";
+          state.progressText = String(e);
           log("Install failed: " + e);
-        } finally {
-          $("go").disabled = false;
+          renderProgress();
         }
       }
 
@@ -1195,27 +1334,38 @@
 
         listen("flash", ({ payload }) => {
           if (payload.kind === "started") {
-            $("progress").style.width = "0%";
-            $("progressText").textContent = "Writing " + payload.parts + " part(s), " +
-              kb(payload.totalBytes) + (payload.demo ? " (demo)" : "") + "…";
+            state.percent = 0;
+            state.progressText = "Writing " + payload.parts + " part(s), " + kb(payload.totalBytes) + "…";
+            renderProgress();
             syncTerminal();
           } else if (payload.kind === "partStarted") {
             log("Part " + payload.index + "/" + payload.parts + " at " + payload.offset +
                 " (" + kb(payload.sizeBytes) + ")");
           } else if (payload.kind === "progress") {
-            $("progress").style.width = payload.percent + "%";
-            $("progressText").textContent = payload.percent + "% — " +
+            state.percent = payload.percent;
+            state.progressText = payload.percent + "% — " +
               kb(payload.writtenBytes) + " of " + kb(payload.totalBytes);
+            // Cheap enough to poke directly; re-rendering on every chunk would
+            // fight the CSS transition on the bar.
+            if ($("progress")) $("progress").style.width = payload.percent + "%";
+            if ($("progressText")) $("progressText").textContent = state.progressText;
           } else if (payload.kind === "log") {
             log(payload.line);
           } else if (payload.kind === "finished") {
-            $("progress").style.width = "100%";
-            $("progressText").textContent = "Done in " + payload.seconds.toFixed(1) + "s" +
-              (payload.demo ? " — demo only, nothing was written" : "") + ".";
+            state.percent = 100;
+            state.phase = "done";
+            state.progressText = "Written and verified in " + payload.seconds.toFixed(1) + "s.";
+            // The board is running something different now, so anything the
+            // Device screen learned about the old firmware is stale.
+            state.running = null;
+            renderDevice();
             log("Install complete.");
+            renderProgress();
           } else if (payload.kind === "failed") {
-            $("progressText").textContent = payload.message;
+            state.phase = "failed";
+            state.progressText = payload.message;
             log("Failed: " + payload.message);
+            renderProgress();
           }
         });
       }
