@@ -108,6 +108,7 @@
       .banner.info { background: #16203a; border: 1px solid #24406e; }
       .banner.bad { background: #2a1416; border: 1px solid #5a2226; color: #ffc9cc; }
       .empty { color: var(--muted); border: 1px dashed var(--line); border-radius: 12px; padding: 26px; text-align: center; margin-top: 14px; }
+      .badtext { color: var(--bad); }
       code { background: #0a0c11; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
       h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted);
            font-weight: 600; margin: 24px 0 2px; }
@@ -204,10 +205,14 @@
         <h1>Device</h1>
         <p class="sub">Plug a board in over USB and identify it. Everything else — which firmware is offered, where it lands in flash — follows from what the chip reports about itself.</p>
 
-        <div class="row">
-          <button id="detect">Detect connected devices</button>
-        </div>
         <div id="deviceInfo"></div>
+
+        <h2>Ports</h2>
+        <div class="row" style="margin-top:8px">
+          <button class="ghost small" id="detect">Scan again</button>
+          <span class="meta" id="deviceStatus"></span>
+        </div>
+        <div id="portList"></div>
       </section>
 
       <section id="screen-install" hidden>
@@ -306,6 +311,8 @@
         builtins: [],
         statuses: [],
         device: null,
+        ports: [],
+        running: null,
         selection: null,
       };
 
@@ -586,63 +593,111 @@
       }
 
       // ── device ─────────────────────────────────────────────────
-      $("detect").addEventListener("click", async () => {
+      $("detect").addEventListener("click", () => scanPorts(false));
+
+      // A recognised USB-serial bridge is a strong hint that a port is a
+      // development board rather than a Bluetooth pairing port or a printer.
+      const looksLikeABoard = (p) => p.bridge && p.bridge !== "unknown";
+
+      async function scanPorts(auto) {
         const btn = $("detect");
         btn.disabled = true;
+        $("deviceStatus").textContent = "Looking for boards…";
         try {
-          const ports = await invoke("list_ports");
-          log("Found " + ports.length + " serial port(s).");
-          if (!ports.length) {
-            $("deviceInfo").innerHTML = '<div class="empty">No serial ports found. Check the cable is a data cable, not power-only.</div>';
-            return;
-          }
-          $("deviceInfo").innerHTML = ports.map((p) =>
-            '<div class="card"><h3>' + esc(p.portName) + "</h3>" +
-            '<div class="meta">' + esc(p.product || "Unknown device") + "</div>" +
-            '<div class="tags"><button class="ghost" data-port="' + esc(p.portName) + '">Identify this device</button></div></div>').join("");
+          state.ports = await invoke("list_ports");
+          log("Found " + state.ports.length + " serial port(s).");
+          renderPorts();
 
-          // Identifying opens the port and talks to the ROM bootloader, so it
-          // is a deliberate click rather than something a scan does to every
-          // port it finds — other programs may be using them.
-          $("deviceInfo").querySelectorAll("button[data-port]").forEach((b) => {
-            b.addEventListener("click", () => identify(b.dataset.port, b));
-          });
+          // On launch, identify only when there is exactly one plausible
+          // board. Identifying resets the chip into its ROM bootloader, and
+          // doing that uninvited to every port firmforge can see would
+          // interrupt whatever else is using them.
+          if (auto && !state.device) {
+            const likely = state.ports.filter(looksLikeABoard);
+            if (likely.length === 1) {
+              log("One board found — identifying " + likely[0].portName + ".");
+              await identify(likely[0].portName);
+            }
+          }
         } catch (e) {
           log("Port scan failed: " + e);
+          $("deviceStatus").textContent = "Could not list serial ports: " + e;
         } finally {
           btn.disabled = false;
         }
-      });
+      }
+
+      function renderPorts() {
+        const ports = state.ports || [];
+        const host = $("portList");
+        if (!ports.length) {
+          $("deviceStatus").textContent = "";
+          host.innerHTML = '<div class="empty">No serial ports found.<br>' +
+            '<span class="meta">Check the cable carries data — many USB cables are charge-only. ' +
+            "Some boards also need their BOOT button held while plugging in.</span></div>";
+          return;
+        }
+
+        $("deviceStatus").textContent = ports.length === 1
+          ? "One port found."
+          : ports.length + " ports found — pick the one your board is on.";
+
+        host.innerHTML = ports.map((p) => {
+          const here = state.device && state.device.port === p.portName;
+          return '<div class="card"><div class="cardhead"><div>' +
+            "<h3>" + esc(p.portName) + "</h3>" +
+            '<div class="meta">' + esc(p.product || "Unknown device") +
+              (p.bridge && p.bridge !== "unknown" ? " · " + esc(p.bridge) : "") + "</div>" +
+            "</div>" +
+            (here
+              ? '<span class="tag ok">Identified</span>'
+              : '<button class="ghost small" data-port="' + esc(p.portName) + '">Identify this device</button>') +
+            "</div>" +
+            (p.needsVendorDriver
+              ? '<ul class="reasons"><li>This bridge usually needs a vendor driver. If identifying fails, that is the first thing to check.</li></ul>'
+              : "") +
+            "</div>";
+        }).join("");
+
+        host.querySelectorAll("button[data-port]").forEach((b) => {
+          b.addEventListener("click", () => identify(b.dataset.port, b));
+        });
+      }
 
       async function identify(port, button) {
-        button.disabled = true;
-        button.textContent = "Identifying…";
+        if (button) { button.disabled = true; button.textContent = "Identifying…"; }
+        $("deviceStatus").textContent = "Talking to " + port + "…";
         log("Connecting to " + port + "…");
         try {
           state.device = await invoke("detect_device", { port: port });
+          state.running = null;
           log("Identified " + state.device.identity.chipFamily + " on " + port + ".");
           syncTerminal();
           if (state.device.identity.chipFamily) {
             state.family = state.device.identity.chipFamily;
             localStorage.setItem("family", state.family);
           }
+          $("deviceStatus").textContent = "";
           renderDevice();
+          renderPorts();
           renderCatalogue();
+          // So the Playground opens already pointed at the board you just
+          // identified, rather than at whatever port sorted first.
+          await termRescan();
         } catch (e) {
-          button.disabled = false;
-          button.textContent = "Identify this device";
+          if (button) { button.disabled = false; button.textContent = "Identify this device"; }
           log("Could not identify " + port + ": " + e);
-          $("deviceInfo").insertAdjacentHTML("beforeend",
-            '<div class="empty">' + esc(String(e)) + "</div>");
+          $("deviceStatus").innerHTML = '<span class="badtext">' + esc(String(e)) + "</span>";
         }
       }
 
       function renderDevice() {
         const d = state.device;
         renderTopBar();
-        if (!d) return;
+        const host = $("deviceInfo");
+        if (!d) { host.innerHTML = ""; return; }
         const i = d.identity;
-        $("deviceInfo").innerHTML =
+        host.innerHTML =
           '<div class="card"><div class="cardhead"><div>' +
             "<h3>" + esc(i.chipFamily) + (i.chipRevision != null ? " rev v" + esc(i.chipRevision) : "") + "</h3>" +
             '<div class="meta">' + esc(d.port) + " · " + kb(i.flashSize) + " flash · " +
@@ -650,12 +705,69 @@
               (i.mac ? " · " + esc(i.mac) : "") + "</div>" +
           "</div>" + '<span class="tag ok">Connected</span>' + "</div>" +
           '<p class="meta" style="margin-top:10px">Read from the chip itself. firmforge refuses to write a build made for a different chip.</p>' +
-          '<div class="tags" style="margin-top:14px">' +
+          '<div id="runningBox" style="margin-top:16px"></div>' +
+          '<div class="tags" style="margin-top:16px">' +
             '<button class="small" id="goFlash">Flash firmware</button>' +
             '<button class="small ghost" id="goPlay">Open playground</button>' +
           "</div></div>";
         $("goFlash").addEventListener("click", () => show("catalogue"));
         $("goPlay").addEventListener("click", () => show("terminal"));
+        renderRunning();
+      }
+
+      // What is on the board already — asked before it gets overwritten.
+      function renderRunning() {
+        const box = $("runningBox");
+        if (!box) return;
+        const r = state.running;
+
+        if (r === "checking") {
+          box.innerHTML = '<div class="meta">Interrupting the board and asking what it is running…</div>';
+          return;
+        }
+        if (!r) {
+          box.innerHTML = '<div class="meta">Running: not checked yet. ' +
+            '<button class="ghost small" id="checkRunning" style="margin-left:6px">What is on this board?</button></div>';
+          $("checkRunning").addEventListener("click", checkRunning);
+          return;
+        }
+        if (r.error) {
+          box.innerHTML = '<div class="meta">Running: could not tell — ' + esc(r.error) + " " +
+            '<button class="ghost small" id="checkRunning" style="margin-left:6px">Try again</button></div>';
+          $("checkRunning").addEventListener("click", checkRunning);
+          return;
+        }
+
+        const detail = r.micropython
+          ? "<b>" + esc(r.version || "MicroPython") + "</b>" +
+            (r.machine ? '<div class="meta">' + esc(r.machine) + "</div>" : "") +
+            (r.freeBytes != null ? '<div class="meta">' + kb(r.freeBytes) + " free on the board's filesystem</div>" : "")
+          : "<b>Not MicroPython</b>" +
+            '<div class="meta">Something is on this board, but it does not answer at a Python prompt. ' +
+            "That is normal for WLED, Tasmota, ESPHome and Marauder — they are used over Wi-Fi or a screen, not a REPL.</div>";
+
+        box.innerHTML = '<div class="meta" style="margin-bottom:4px">Running</div>' + detail +
+          '<div class="tags" style="margin-top:10px">' +
+            '<button class="ghost small" id="checkRunning">Check again</button>' +
+          "</div>";
+        $("checkRunning").addEventListener("click", checkRunning);
+      }
+
+      async function checkRunning() {
+        state.running = "checking";
+        renderRunning();
+        try {
+          state.running = await invoke("identify_running", { port: state.device.port });
+          log(state.running.micropython
+            ? "Board is running " + (state.running.version || "MicroPython") + "."
+            : "Board did not answer at a Python prompt.");
+          // The probe borrows the port, so the terminal may have lost it.
+          syncTerminal();
+        } catch (e) {
+          state.running = { error: String(e) };
+          log("Could not check what is running: " + e);
+        }
+        renderRunning();
       }
 
       // ── catalogue ──────────────────────────────────────────────
@@ -1131,6 +1243,9 @@
         renderSources();
         await loadBuiltins();
         await termRescan();
+        // Last, because it opens a port: everything above should already be on
+        // screen by the time firmforge touches the cable.
+        await scanPorts(true);
       }
     </script>
   </body>
