@@ -1,0 +1,66 @@
+name: desktop-build
+
+# Produces installable firmforge desktop builds for every platform.
+#
+# Run it from the Actions tab ("Run workflow"), or push a v* tag. Artifacts are
+# attached to the run and can be downloaded without a local Rust toolchain —
+# which matters on machines where an Application Control / WDAC policy blocks
+# locally-compiled build scripts from executing.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: windows
+            artifacts: |
+              target/release/firmforge-desktop.exe
+              target/release/bundle/msi/*.msi
+              target/release/bundle/nsis/*.exe
+          - os: macos-latest
+            label: macos-apple-silicon
+            artifacts: |
+              target/release/bundle/dmg/*.dmg
+              target/release/bundle/macos/*.app
+          - os: ubuntu-latest
+            label: linux
+            artifacts: |
+              target/release/firmforge-desktop
+              target/release/bundle/deb/*.deb
+              target/release/bundle/appimage/*.AppImage
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install Linux system dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev libwebkit2gtk-4.1-dev \
+            libappindicator3-dev librsvg2-dev patchelf libfuse2
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
+
+      - name: Build
+        working-directory: apps/desktop/src-tauri
+        run: cargo tauri build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmforge-${{ matrix.label }}
+          path: ${{ matrix.artifacts }}
+          if-no-files-found: warn
