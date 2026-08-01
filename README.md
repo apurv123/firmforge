@@ -32,8 +32,37 @@ firmforge/
 
 ## Status
 
-Early. See [`plan/spec/firmforge-spec.md`](plan/spec/firmforge-spec.md) for the product specification, and
-[`plan/spec/product-research/`](plan/spec/product-research/) for the competitive teardowns that informed it.
+[![ci](https://github.com/apurv123/firmforge/actions/workflows/ci.yml/badge.svg)](https://github.com/apurv123/firmforge/actions/workflows/ci.yml)
+
+**Milestone M0 — Skeleton: complete.** The workspace builds and 20 tests pass on Windows, macOS and Linux; `cargo check -p firmforge-desktop` is green on all three.
+
+Implemented so far:
+
+- **`firmforge-core`** — the ESP Web Tools-compatible manifest format plus firmforge extensions (channels, per-part SHA-256, signatures, constraints, variants, assets), device identity, compatibility matching with plain-language reasons, and artifact verification.
+- **`firmforge-flash`** — transport abstraction across USB serial / Android USB host / BLE / OTA, USB-to-UART bridge identification for the driver doctor, and desktop serial enumeration.
+- **`firmforge-app`** — the shared command surface used by both shells (and, later, a headless CLI).
+- **`apps/desktop`** — a Tauri v2 shell rendering spec screen D2 and calling the real `list_ports` command.
+- **`firmware/`** — the repository convention with a worked, parsed-in-tests manifest.
+
+Next: **M1 — Read** (GitHub sourcing, catalogue UI, cache). See the [roadmap](plan/spec/firmforge-spec.md#11-roadmap).
+
+## Documentation
+
+| Document | What it is |
+|---|---|
+| [`plan/spec/firmforge-spec.md`](plan/spec/firmforge-spec.md) | **The product specification** — desktop and mobile app descriptions, features, 7 workflows, 19 UX screens, architecture, roadmap, metrics |
+| [`plan/spec/pm-requirements.md`](plan/spec/pm-requirements.md) | PM/technical requirements — GitHub sourcing, flashing stack, platform constraints, security model, NFRs, risks |
+| [`plan/spec/product-research/`](plan/spec/product-research/) | Teardowns of Bruce, ESP32 Marauder, ESPHome, ESP Web Tools, M5Burner, Meshtastic and Flipper Zero, with 52 screenshots |
+| [`firmware/README.md`](firmware/README.md) | The firmware repository convention |
+
+## Building
+
+```bash
+cargo test  -p firmforge-core -p firmforge-flash -p firmforge-app
+cargo check -p firmforge-desktop
+```
+
+On Linux the desktop shell additionally needs `libudev-dev` and `libwebkit2gtk-4.1-dev`.
 
 ## License
 
