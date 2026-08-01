@@ -122,8 +122,16 @@ pub struct Build {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Manifest {
+    /// ESP Web Tools treats `name` as required, but real manifests in the wild
+    /// omit it, so a missing name must not cost the user a whole source.
+    #[serde(default = "unknown_name")]
     pub name: String,
+
+    /// Likewise optional in practice: Tasmota's published manifest has no
+    /// `version` at all. Defaulting beats refusing to parse.
+    #[serde(default)]
     pub version: String,
+
     pub builds: Vec<Build>,
 
     // ---- ESP Web Tools optional metadata ----
@@ -150,6 +158,32 @@ impl Manifest {
     pub fn to_json(&self) -> crate::Result<String> {
         Ok(serde_json::to_string_pretty(self)?)
     }
+
+    /// Every distinct chip family this manifest can install onto.
+    pub fn chip_families(&self) -> Vec<String> {
+        let mut families: Vec<String> = self
+            .builds
+            .iter()
+            .map(|b| b.chip_family.clone())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        families.sort();
+        families
+    }
+
+    /// A version string safe to render, for manifests that omit one.
+    pub fn display_version(&self) -> &str {
+        if self.version.is_empty() {
+            "unversioned"
+        } else {
+            &self.version
+        }
+    }
+}
+
+fn unknown_name() -> String {
+    "Unnamed firmware".to_string()
 }
 
 #[cfg(test)]

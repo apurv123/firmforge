@@ -8,6 +8,7 @@
 pub mod flash;
 pub mod github;
 pub mod install;
+pub mod sources;
 
 use firmforge_core::{
     device::DeviceIdentity,
@@ -19,6 +20,7 @@ use serde::{Deserialize, Serialize};
 pub use flash::{demo_target, FlashEvent, Target};
 pub use github::{discover, DiscoveredManifest, Source};
 pub use install::{prepare, PartSummary, Prepared};
+pub use sources::{load_builtin, load_builtins, load_bundled, SourceStatus};
 
 /// A catalogue entry as rendered on a firmforge card (spec screen D3).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -101,7 +103,7 @@ fn entry_for(
 
     CatalogueEntry {
         name: manifest.name.clone(),
-        version: manifest.version.clone(),
+        version: manifest.display_version().to_string(),
         channel: serde_json::to_value(manifest.channel)
             .ok()
             .and_then(|v| v.as_str().map(str::to_string))

@@ -50,7 +50,37 @@ fn catalogue(
     Ok(build_catalogue(&manifest, device.as_ref()))
 }
 
-/// Add a GitHub repository and read every firmware manifest it publishes.
+/// The chip families the app offers as its first-run choice.
+#[tauri::command]
+fn chip_families() -> Vec<firmforge_core::ChipFamily> {
+    firmforge_core::chip::all()
+}
+
+/// The curated source list, so a fresh install is not an empty screen.
+#[tauri::command]
+fn builtin_sources() -> Vec<firmforge_core::BuiltinSource> {
+    firmforge_core::builtin::all()
+}
+
+/// When the built-in list was last verified against the live URLs.
+#[tauri::command]
+fn builtin_curated_on() -> String {
+    firmforge_core::builtin::CURATED_ON.to_string()
+}
+
+/// Load the sources a fresh install starts with.
+#[tauri::command]
+async fn load_bundled_sources() -> Vec<firmforge_app::SourceStatus> {
+    firmforge_app::load_bundled().await
+}
+
+/// Reload a specific set of built-ins — the ones the user has kept.
+#[tauri::command]
+async fn load_builtin_sources(ids: Vec<String>) -> Vec<firmforge_app::SourceStatus> {
+    firmforge_app::load_builtins(&ids).await
+}
+
+/// Add a firmware source: a GitHub repository, or a published manifest URL.
 #[tauri::command]
 async fn add_source(repo: String) -> Result<Vec<DiscoveredManifest>, String> {
     let source = Source::parse(&repo).map_err(|e| e.to_string())?;
@@ -87,7 +117,7 @@ async fn prepare_install(
 
     Ok(InstallPlan {
         name: discovered.manifest.name.clone(),
-        version: discovered.manifest.version.clone(),
+        version: discovered.manifest.display_version().to_string(),
         chip_family: build.chip_family.clone(),
         total_bytes: prepared.total_bytes(),
         fully_verified: !prepared.summaries.is_empty()
@@ -153,6 +183,11 @@ pub fn run() {
             catalogue,
             catalogue_for,
             add_source,
+            chip_families,
+            builtin_sources,
+            builtin_curated_on,
+            load_bundled_sources,
+            load_builtin_sources,
             prepare_install,
             run_install
         ])

@@ -6,6 +6,8 @@
 //!
 //! See `plan/spec/firmforge-spec.md` §6 for the data model this implements.
 
+pub mod builtin;
+pub mod chip;
 pub mod device;
 pub mod error;
 pub mod manifest;
@@ -13,6 +15,8 @@ pub mod matching;
 pub mod source;
 pub mod verify;
 
+pub use builtin::{Availability, BuiltinSource, Locator, Tier};
+pub use chip::{ChipFamily, SupportLevel};
 pub use device::{Device, DeviceIdentity, SerialType};
 pub use error::{Error, Result};
 pub use manifest::{Build, Channel, Manifest, Part};

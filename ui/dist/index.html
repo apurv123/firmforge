@@ -76,12 +76,17 @@
       .banner.bad { background: #2a1416; border: 1px solid #5a2226; color: #ffc9cc; }
       .empty { color: var(--muted); border: 1px dashed var(--line); border-radius: 12px; padding: 26px; text-align: center; margin-top: 14px; }
       code { background: #0a0c11; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+      h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted);
+           font-weight: 600; margin: 24px 0 2px; }
+      h2 + .meta { margin: 0 0 10px; }
+      .reasons a { color: inherit; }
     </style>
   </head>
   <body>
     <nav>
       <div class="brand">firm<span>forge</span></div>
-      <a data-screen="sources" aria-current="page">Sources</a>
+      <a data-screen="chips" aria-current="page">Chip</a>
+      <a data-screen="sources">Sources</a>
       <a data-screen="catalogue">Catalogue</a>
       <a data-screen="device">Device</a>
       <a data-screen="install">Install</a>
@@ -90,17 +95,23 @@
     </nav>
 
     <main>
-      <section id="screen-sources">
+      <section id="screen-chips">
+        <h1>Which chip are you working with?</h1>
+        <p class="sub">Everything else follows from this: which firmware is shown, where each file lands in flash, and how the board is talked to. You can change it at any time.</p>
+        <div id="familyList"></div>
+      </section>
+
+      <section id="screen-sources" hidden>
         <h1>Firmware sources</h1>
-        <p class="sub">Add a GitHub repository. firmforge reads <code>firmware/manifest.json</code> from its default branch, and any <code>manifest.json</code> attached to its releases.</p>
+        <p class="sub">firmforge starts with a few well-known publishers so it is useful immediately. Add your own by pasting a GitHub repository or a link to a published <code>manifest.json</code>.</p>
 
         <div class="row">
-          <input type="text" id="repo" placeholder="owner/repo  —  e.g. apurv123/firmforge" />
+          <input type="text" id="repo" placeholder="owner/repo, or https://…/manifest.json" />
           <button id="addSource">Add source</button>
         </div>
         <p class="meta" style="margin-top:8px">
-          The catalogue ships empty on purpose: you choose what firmware to trust.
-          firmforge prefers linking to a publisher's own release assets over rehosting their binaries.
+          firmforge links to each publisher's own downloads rather than rehosting their binaries.
+          Every source here can be removed, and removals are remembered.
         </p>
 
         <div id="sourceList"></div>
@@ -108,7 +119,7 @@
 
       <section id="screen-catalogue" hidden>
         <h1>Catalogue</h1>
-        <p class="sub">Firmware from your sources, checked against the selected device.</p>
+        <p class="sub" id="catalogueSub">Firmware from your sources, checked against the selected device.</p>
         <div id="catalogueList"></div>
       </section>
 
@@ -143,7 +154,14 @@
       const listen = window.__TAURI__ && window.__TAURI__.event && window.__TAURI__.event.listen;
 
       const state = {
+        // User-added sources are cached; built-ins are refetched every launch
+        // so a link that has gone stale is noticed rather than remembered.
         discovered: JSON.parse(localStorage.getItem("discovered") || "[]"),
+        family: localStorage.getItem("family") || null,
+        removedBuiltins: JSON.parse(localStorage.getItem("removedBuiltins") || "[]"),
+        addedSuggestions: JSON.parse(localStorage.getItem("addedSuggestions") || "[]"),
+        builtins: [],
+        statuses: [],
         device: null,
         selection: null,
       };
@@ -162,15 +180,59 @@
       document.querySelectorAll("nav a").forEach((a) => {
         a.addEventListener("click", () => show(a.dataset.screen));
       });
+      const SCREENS = ["chips", "sources", "catalogue", "device", "install", "console"];
       function show(name) {
         document.querySelectorAll("nav a").forEach((a) =>
           a.setAttribute("aria-current", a.dataset.screen === name ? "page" : "false"));
-        ["sources", "catalogue", "device", "install", "console"].forEach((s) => {
-          $("screen-" + s).hidden = s !== name;
-        });
+        SCREENS.forEach((s) => { $("screen-" + s).hidden = s !== name; });
       }
 
       const save = () => localStorage.setItem("discovered", JSON.stringify(state.discovered));
+      const saveRemovals = () => {
+        localStorage.setItem("removedBuiltins", JSON.stringify(state.removedBuiltins));
+        localStorage.setItem("addedSuggestions", JSON.stringify(state.addedSuggestions));
+      };
+
+      // ── chip family ────────────────────────────────────────────
+      // The first thing asked, before any firmware is shown. Unsupported
+      // families are listed rather than hidden, so someone holding a C3 finds
+      // out now instead of after a failed install.
+      async function renderFamilies() {
+        state.families = state.families || await invoke("chip_families");
+        $("familyList").innerHTML = state.families.map((f) => {
+          const chosen = f.id === state.family;
+          const ok = f.support === "supported";
+          return '<div class="card' + (ok ? "" : " dim") + '"><div class="cardhead"><div>' +
+            "<h3>" + esc(f.displayName) + "</h3>" +
+            '<div class="meta">' + esc(f.note) + "</div>" +
+            '<div class="meta">e.g. ' + f.exampleBoards.map(esc).join(", ") + "</div>" +
+            "</div>" +
+            (ok
+              ? '<button class="small' + (chosen ? " ghost" : "") + '" data-family="' + esc(f.id) + '">' +
+                  (chosen ? "Selected" : "Choose") + "</button>"
+              : '<span class="tag warn">Not supported yet</span>') +
+            "</div></div>";
+        }).join("");
+
+        $("familyList").querySelectorAll("[data-family]").forEach((b) =>
+          b.addEventListener("click", () => chooseFamily(b.dataset.family)));
+      }
+
+      async function chooseFamily(id) {
+        const first = !state.family;
+        state.family = id;
+        localStorage.setItem("family", id);
+        log("Chip family set to " + id + ".");
+        renderFamilies();
+        renderSources();
+        renderCatalogue();
+        if (first) show("sources");
+      }
+
+      function familyMatches(value) {
+        return !state.family || !value ||
+          String(value).toLowerCase() === state.family.toLowerCase();
+      }
 
       // ── sources ────────────────────────────────────────────────
       $("addSource").addEventListener("click", addSource);
@@ -202,6 +264,37 @@
         }
       }
 
+      // ── built-in sources ───────────────────────────────────────
+      // Loaded on every launch, minus anything the user removed. Refetching
+      // rather than caching is what makes a stale link visible.
+      async function loadBuiltins() {
+        state.builtins = await invoke("builtin_sources");
+        state.curatedOn = await invoke("builtin_curated_on");
+        const keep = state.builtins
+          .filter((b) => b.tier === "bundled" || state.addedSuggestions.includes(b.id))
+          .filter((b) => !state.removedBuiltins.includes(b.id))
+          .map((b) => b.id);
+        if (!keep.length) { state.statuses = []; renderSources(); renderCatalogue(); return; }
+
+        renderSources();
+        state.statuses = await invoke("load_builtin_sources", { ids: keep });
+        const broken = state.statuses.filter((s) => !s.available);
+        log("Loaded " + (state.statuses.length - broken.length) + " of " +
+            state.statuses.length + " built-in sources.");
+        broken.forEach((s) => log(s.name + " unavailable: " + s.problem));
+        renderSources();
+        renderCatalogue();
+      }
+
+      /// Everything the catalogue should consider: built-ins that loaded, plus
+      /// user-added sources.
+      function allManifests() {
+        return state.statuses
+          .filter((s) => s.available)
+          .reduce((acc, s) => acc.concat(s.manifests), [])
+          .concat(state.discovered);
+      }
+
       function renderSources(error) {
         const host = $("sourceList");
         host.innerHTML = "";
@@ -209,11 +302,33 @@
           host.insertAdjacentHTML("beforeend",
             '<div class="banner bad" style="margin-top:16px">' + esc(error) + "</div>");
         }
+
+        const added = state.addedSuggestions;
+        const active = state.builtins.filter((b) =>
+          (b.tier === "bundled" || added.includes(b.id)) && !state.removedBuiltins.includes(b.id));
+        const offered = state.builtins.filter((b) =>
+          b.tier === "suggested" && !added.includes(b.id) && !state.removedBuiltins.includes(b.id));
+
+        if (active.length) {
+          host.insertAdjacentHTML("beforeend",
+            "<h2>Included</h2><p class=\"meta\">Shipped with firmforge and checked on " +
+            esc(state.curatedOn || "release") + ". Remove any you do not want.</p>");
+          active.forEach((b) => host.insertAdjacentHTML("beforeend", builtinCard(b)));
+        }
+
+        if (offered.length) {
+          host.insertAdjacentHTML("beforeend",
+            "<h2 style=\"margin-top:26px\">Also available</h2>" +
+            "<p class=\"meta\">Not added automatically. These are security-testing tools, " +
+            "so adding them is your decision to make deliberately.</p>");
+          offered.forEach((b) => host.insertAdjacentHTML("beforeend", builtinCard(b)));
+        }
+
         const slugs = [...new Set(state.discovered.map((d) => d.source))];
+        host.insertAdjacentHTML("beforeend", "<h2 style=\"margin-top:26px\">Your sources</h2>");
         if (!slugs.length) {
           host.insertAdjacentHTML("beforeend",
-            '<div class="empty">No sources yet. Try <code>esphome/firmware</code>, or your own repository.</div>');
-          return;
+            '<div class="empty">Nothing added yet. Paste a repository like <code>apurv123/firmforge</code>, or a link to a published manifest.</div>');
         }
         slugs.forEach((slug) => {
           const items = state.discovered.filter((d) => d.source === slug);
@@ -225,12 +340,73 @@
             '</div><button class="ghost small" data-remove="' + esc(slug) + '">Remove</button></div>' +
             '<div class="tags">' + items.map((i) => '<span class="tag">' + esc(i.provenance) + "</span>").join("") + "</div></div>");
         });
+
+        if (state.removedBuiltins.length) {
+          host.insertAdjacentHTML("beforeend",
+            '<p class="meta" style="margin-top:22px">' + state.removedBuiltins.length +
+            ' included source(s) removed. <button class="ghost small" id="restore">Restore defaults</button></p>');
+          $("restore").addEventListener("click", () => {
+            state.removedBuiltins = []; saveRemovals();
+            log("Restored the default source list.");
+            loadBuiltins();
+          });
+        }
+
         host.querySelectorAll("[data-remove]").forEach((b) =>
           b.addEventListener("click", () => {
             state.discovered = state.discovered.filter((d) => d.source !== b.dataset.remove);
             save(); renderSources(); renderCatalogue();
             log("Removed source " + b.dataset.remove + ".");
           }));
+
+        host.querySelectorAll("[data-drop-builtin]").forEach((b) =>
+          b.addEventListener("click", () => {
+            const id = b.dataset.dropBuiltin;
+            state.removedBuiltins = state.removedBuiltins.concat([id]);
+            state.addedSuggestions = state.addedSuggestions.filter((x) => x !== id);
+            saveRemovals();
+            log("Removed built-in source " + id + ". It will not come back on restart.");
+            loadBuiltins();
+          }));
+
+        host.querySelectorAll("[data-add-builtin]").forEach((b) =>
+          b.addEventListener("click", () => {
+            state.addedSuggestions = state.addedSuggestions.concat([b.dataset.addBuiltin]);
+            saveRemovals();
+            log("Added " + b.dataset.addBuiltin + " at your request.");
+            loadBuiltins();
+          }));
+      }
+
+      function builtinCard(b) {
+        const status = state.statuses.find((s) => s.id === b.id);
+        const isActive = b.tier === "bundled" || state.addedSuggestions.includes(b.id);
+        const relevant = b.families.some(familyMatches);
+
+        let badge = '<span class="tag">Loading…</span>';
+        if (!isActive) badge = "";
+        else if (status && status.available)
+          badge = '<span class="tag ok">' + status.buildCount + " build(s)</span>";
+        else if (status) badge = '<span class="tag warn">Unavailable</span>';
+
+        const action = isActive
+          ? '<button class="ghost small" data-drop-builtin="' + esc(b.id) + '">Remove</button>'
+          : (b.availability === "ready"
+              ? '<button class="small" data-add-builtin="' + esc(b.id) + '">Add</button>'
+              : '<span class="tag warn">Cannot install</span>');
+
+        return '<div class="card' + (relevant ? "" : " dim") + '"><div class="cardhead"><div>' +
+          "<h3>" + esc(b.name) + "</h3>" +
+          '<div class="meta">' + esc(b.summary) + "</div>" +
+          "</div>" + action + "</div>" +
+          '<div class="tags">' + badge +
+            '<span class="tag">' + esc(b.license) + "</span>" +
+            (relevant ? "" : '<span class="tag">No ' + esc(state.family || "") + " build</span>") +
+          "</div>" +
+          (b.caution ? '<ul class="reasons"><li>' + esc(b.caution) + "</li></ul>" : "") +
+          (status && status.problem ? '<ul class="reasons"><li>' + esc(status.problem) +
+            ' <a href="' + esc(b.homepage) + '" target="_blank" rel="noreferrer">Open project page</a></li></ul>' : "") +
+          "</div>";
       }
 
       // ── device ─────────────────────────────────────────────────
@@ -274,17 +450,33 @@
       // ── catalogue ──────────────────────────────────────────────
       async function renderCatalogue() {
         const host = $("catalogueList");
-        if (!state.discovered.length) {
-          host.innerHTML = '<div class="empty">Nothing yet — add a source first.</div>';
+        const manifests = allManifests();
+        $("catalogueSub").textContent = state.family
+          ? "Firmware for " + state.family + ", from your sources."
+          : "Firmware from your sources.";
+
+        if (!manifests.length) {
+          host.innerHTML = '<div class="empty">Nothing to show yet — check the Sources screen.</div>';
           return;
         }
-        const entries = await invoke("catalogue_for", {
-          discovered: state.discovered,
+        const all = await invoke("catalogue_for", {
+          discovered: manifests,
           device: state.device ? state.device.identity : null,
         });
 
+        // Filtered by chip family rather than by device, so the catalogue is
+        // useful before anything is plugged in.
+        const entries = all.filter((e) => familyMatches(e.chipFamily));
+
         host.innerHTML = state.device ? "" :
-          '<div class="banner info">No device selected, so nothing is being filtered. Pick a device to see what actually fits.</div>';
+          '<div class="banner info">No device selected, so compatibility is not being checked in detail. Pick a device to see what actually fits.</div>';
+
+        if (!entries.length) {
+          host.insertAdjacentHTML("beforeend",
+            '<div class="empty">None of your sources publish a ' + esc(state.family || "matching") +
+            " build. Try another chip family, or add a source.</div>");
+          return;
+        }
 
         entries.forEach((e, index) => {
           const compatible = e.compatibility.compatible;
@@ -309,7 +501,7 @@
 
       // ── install ────────────────────────────────────────────────
       async function choose(entry) {
-        const discovered = state.discovered.find(
+        const discovered = allManifests().find(
           (d) => d.source === entry.source && d.manifestUrl === entry.manifestUrl);
         if (!discovered) return;
 
@@ -406,9 +598,21 @@
         document.querySelector("main").insertAdjacentHTML("afterbegin",
           '<div class="banner bad">Not running inside the firmforge desktop app.</div>');
       } else {
-        renderSources();
-        renderCatalogue();
+        start();
+      }
+
+      async function start() {
         log("firmforge ready.");
+        await renderFamilies();
+        if (state.family) {
+          // Returning user: go straight to what they came for.
+          show("sources");
+          log("Chip family: " + state.family + ".");
+        } else {
+          log("First run — choose a chip family to begin.");
+        }
+        renderSources();
+        await loadBuiltins();
       }
     </script>
   </body>
