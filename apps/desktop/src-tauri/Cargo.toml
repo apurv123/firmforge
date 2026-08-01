@@ -17,6 +17,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 firmforge-app.workspace = true
 firmforge-core.workspace = true
+firmforge-flash.workspace = true
 tauri = { version = "2", features = [] }
 serde.workspace = true
 serde_json.workspace = true
+tokio.workspace = true

@@ -62,11 +62,12 @@ produced by CI — see [Installing and testing](#installing-and-testing).
   release asset or a rehosted copy
 - Run the whole thing against a **demo device**, so the workflow can be tried
   without owning an ESP32 and without writing to anything
+- **Flash a real ESP32** over USB: firmforge identifies the chip by talking to
+  its ROM bootloader, refuses any build meant for a different chip, writes each
+  part, and reads it back to confirm what landed
 
 **What does not work yet**
 
-- Writing to real hardware. `espflash` is not wired in, so selecting a real
-  serial port will tell you so rather than pretending.
 - The mobile app. The shared crates are structured for it, but no Android or
   iOS project exists yet.
 - Signature verification, rollback, and the serial console.
@@ -102,18 +103,19 @@ bricked.
 ## Installing and testing
 
 > **What you get today:** the full workflow — pick a chip, browse firmware that
-> is already there, download and verify it — against a demo device. Writing to
-> real hardware is not implemented yet.
+> is already there, download and verify it, then either rehearse the write
+> against a demo device or flash a real ESP32 over USB.
 
 ### Try it in five clicks
 
 1. Install a build (below) and open firmforge.
 2. **Chip** → *ESP32-S3*. ESPHome, WLED and Tasmota load on their own.
 3. **Sources** → *Also available* → *Add* on **ESP32 Marauder**.
-4. **Device** → *Use demo device*. Then **Catalogue** → *Install* on the
-   ESP32-S3 Marauder build. The ESP32 build beside it stays dimmed, and tells
-   you why.
-5. **Install** → check the parts table, then *Run demo install*, and watch the
+4. **Device** → *Use demo device*, or plug a board in and use
+   *Detect connected devices* → *Identify this device*. Then **Catalogue** →
+   *Install* on the ESP32-S3 Marauder build. The ESP32 build beside it stays
+   dimmed, and tells you why.
+5. **Install** → check the parts table, then *Flash*, and watch the
    **Console**.
 
 That downloads ~1.5 MB of real ESP32 Marauder firmware from Marauder's own

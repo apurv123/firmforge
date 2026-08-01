@@ -10,7 +10,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.82"
+rust-version = "1.88"
 license = "MIT"
 repository = "https://github.com/apurv123/firmforge"
 authors = ["apurv123"]
@@ -26,9 +26,13 @@ thiserror = "2"
 sha2 = "0.10"
 hex = "0.4"
 serialport = "4.9"
+# Default features pull in espflash's whole CLI (clap, indicatif, update checks).
+# `serialport` is the feature that exposes Flasher and Connection, which is all
+# firmforge uses.
+espflash = { version = "4.5", default-features = false, features = ["serialport"] }
 url = "2"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
 
 [profile.release]
 lto = true

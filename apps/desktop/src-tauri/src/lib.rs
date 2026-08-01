@@ -127,16 +127,40 @@ async fn prepare_install(
     })
 }
 
+/// Identify the chip on a port without writing anything.
+///
+/// This is what lets the catalogue filter by what is actually connected rather
+/// than by what the user believes they plugged in.
+#[tauri::command]
+async fn detect_device(port: String) -> Result<Target, String> {
+    let identity = tokio::task::spawn_blocking({
+        let port = port.clone();
+        move || firmforge_flash::esp::detect(&port)
+    })
+    .await
+    .map_err(|e| format!("device detection stopped unexpectedly: {e}"))?
+    .map_err(|e| e.to_string())?;
+
+    Ok(Target {
+        port,
+        identity,
+        demo: false,
+    })
+}
+
 /// Run the install. Progress arrives on the `flash` event channel.
 ///
 /// `demo` writes nothing; it re-downloads, re-verifies and simulates the write
 /// so a manifest can be rehearsed end to end before real hardware is risked.
+/// When `demo` is false, `port` must name a connected device — the write is
+/// refused if the chip on that port disagrees with the build's `chipFamily`.
 #[tauri::command]
 async fn run_install(
     app: AppHandle,
     discovered: DiscoveredManifest,
     build_index: usize,
     demo: bool,
+    port: Option<String>,
 ) -> Result<(), String> {
     let emit = {
         let app = app.clone();
@@ -145,14 +169,19 @@ async fn run_install(
         }
     };
 
-    if !demo {
-        let message =
-            "Writing to real hardware is not implemented yet — use the demo device.".to_string();
-        emit(flash::FlashEvent::Failed {
-            message: message.clone(),
-        });
-        return Err(message);
-    }
+    let port = if demo {
+        None
+    } else {
+        let port = port.unwrap_or_default();
+        if port.is_empty() {
+            let message = "Choose the port your device is connected to first.".to_string();
+            emit(flash::FlashEvent::Failed {
+                message: message.clone(),
+            });
+            return Err(message);
+        }
+        Some(port)
+    };
 
     let build = discovered
         .manifest
@@ -170,8 +199,16 @@ async fn run_install(
         }
     };
 
-    flash::run_demo(&prepared, emit).await;
-    Ok(())
+    match port {
+        // Everything is downloaded and checksummed before this point, so the
+        // window in which a failure can leave the board half-written is as
+        // narrow as the write itself.
+        Some(port) => flash::run_serial(&port, &build.chip_family, &prepared, emit).await,
+        None => {
+            flash::run_demo(&prepared, emit).await;
+            Ok(())
+        }
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -189,6 +226,7 @@ pub fn run() {
             load_bundled_sources,
             load_builtin_sources,
             prepare_install,
+            detect_device,
             run_install
         ])
         .run(tauri::generate_context!())

@@ -418,19 +418,54 @@
       });
 
       $("detect").addEventListener("click", async () => {
+        const btn = $("detect");
+        btn.disabled = true;
         try {
           const ports = await invoke("list_ports");
           log("Found " + ports.length + " serial port(s).");
-          $("deviceInfo").innerHTML = ports.length
-            ? ports.map((p) =>
-                '<div class="card"><h3>' + esc(p.portName) + "</h3>" +
-                '<div class="meta">' + esc(p.product || "Unknown device") + "</div>" +
-                '<div class="tags"><span class="tag warn">Real flashing not implemented yet</span></div></div>').join("")
-            : '<div class="empty">No serial ports found. Plug in a board, or use the demo device.</div>';
+          if (!ports.length) {
+            $("deviceInfo").innerHTML = '<div class="empty">No serial ports found. Plug in a board, or use the demo device.</div>';
+            return;
+          }
+          $("deviceInfo").innerHTML = ports.map((p) =>
+            '<div class="card"><h3>' + esc(p.portName) + "</h3>" +
+            '<div class="meta">' + esc(p.product || "Unknown device") + "</div>" +
+            '<div class="tags"><button class="ghost" data-port="' + esc(p.portName) + '">Identify this device</button></div></div>').join("");
+
+          // Identifying opens the port and talks to the ROM bootloader, so it
+          // is a deliberate click rather than something a scan does to every
+          // port it finds — other programs may be using them.
+          $("deviceInfo").querySelectorAll("button[data-port]").forEach((b) => {
+            b.addEventListener("click", () => identify(b.dataset.port, b));
+          });
         } catch (e) {
           log("Port scan failed: " + e);
+        } finally {
+          btn.disabled = false;
         }
       });
+
+      async function identify(port, button) {
+        button.disabled = true;
+        button.textContent = "Identifying…";
+        log("Connecting to " + port + "…");
+        try {
+          state.device = await invoke("detect_device", { port: port });
+          log("Identified " + state.device.identity.chipFamily + " on " + port + ".");
+          if (state.device.identity.chipFamily) {
+            state.family = state.device.identity.chipFamily;
+            localStorage.setItem("family", state.family);
+          }
+          renderDevice();
+          renderCatalogue();
+        } catch (e) {
+          button.disabled = false;
+          button.textContent = "Identify this device";
+          log("Could not identify " + port + ": " + e);
+          $("deviceInfo").insertAdjacentHTML("beforeend",
+            '<div class="empty">' + esc(String(e)) + "</div>");
+        }
+      }
 
       function renderDevice() {
         const d = state.device;
@@ -439,11 +474,14 @@
         $("chip").innerHTML = "<b>" + esc(i.chipFamily) + "</b><br>" + esc(d.port) + (d.demo ? " · demo" : "");
         $("deviceInfo").innerHTML =
           '<div class="card"><div class="cardhead"><div>' +
-            "<h3>" + esc(i.chipFamily) + "</h3>" +
+            "<h3>" + esc(i.chipFamily) + (i.chipRevision != null ? " rev v" + esc(i.chipRevision) : "") + "</h3>" +
             '<div class="meta">' + esc(d.port) + " · " + kb(i.flashSize) + " flash · " +
-              (i.hasPsram ? "PSRAM" : "no PSRAM") + " · " + esc(i.serialType) + "</div>" +
-          "</div>" + (d.demo ? '<span class="tag warn">Demo</span>' : "") + "</div>" +
-          (d.demo ? '<p class="meta" style="margin-top:10px">A simulated ESP32-S3. Firmware is really downloaded and really verified; only the write to hardware is simulated.</p>' : "") +
+              (i.hasPsram ? "PSRAM" : "no PSRAM") + " · " + esc(i.serialType) +
+              (i.mac ? " · " + esc(i.mac) : "") + "</div>" +
+          "</div>" + (d.demo ? '<span class="tag warn">Demo</span>' : '<span class="tag ok">Connected</span>') + "</div>" +
+          (d.demo
+            ? '<p class="meta" style="margin-top:10px">A simulated ESP32-S3. Firmware is really downloaded and really verified; only the write to hardware is simulated.</p>'
+            : '<p class="meta" style="margin-top:10px">Read from the chip itself. firmforge refuses to write a build made for a different chip.</p>') +
           "</div>";
       }
 
@@ -551,12 +589,21 @@
 
       async function runInstall() {
         const sel = state.selection;
+        const demo = !!state.device.demo;
+        if (!demo) {
+          const ok = confirm(
+            "This will overwrite the firmware on " + state.device.port + " (" +
+            state.device.identity.chipFamily + ").\n\n" +
+            "Keep the board plugged in until it finishes. Continue?");
+          if (!ok) return;
+        }
         $("go").disabled = true;
         try {
           await invoke("run_install", {
             discovered: sel.discovered,
             buildIndex: sel.buildIndex,
-            demo: !!state.device.demo,
+            demo: demo,
+            port: demo ? null : state.device.port,
           });
         } catch (e) {
           $("progressText").textContent = String(e);
