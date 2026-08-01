@@ -179,7 +179,7 @@ fn usb_info_for(port_name: &str) -> serialport::UsbPortInfo {
         })
     });
 
-    found.unwrap_or_else(|| serialport::UsbPortInfo {
+    found.unwrap_or(serialport::UsbPortInfo {
         vid: 0,
         pid: 0,
         serial_number: None,
