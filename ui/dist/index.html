@@ -80,6 +80,37 @@
            font-weight: 600; margin: 24px 0 2px; }
       h2 + .meta { margin: 0 0 10px; }
       .reasons a { color: inherit; }
+
+      /* terminal */
+      #term {
+        background: #06070a; border: 1px solid var(--line); border-radius: 10px;
+        padding: 12px; color: #cdd3e0; overflow-y: auto; margin-top: 14px;
+        font: 12.5px/1.55 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+        height: 46vh; white-space: pre-wrap; word-break: break-word;
+      }
+      #term .sent { color: var(--accent); }
+      #term .err { color: var(--bad); }
+      #term .note { color: var(--muted); font-style: italic; }
+      #termInput {
+        flex: 1; background: #06070a; border: 1px solid var(--line); color: var(--text);
+        border-radius: 8px; padding: 10px 12px;
+        font: 12.5px ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+      }
+      #termInput:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+      textarea {
+        width: 100%; min-height: 128px; background: #06070a; border: 1px solid var(--line);
+        color: var(--text); border-radius: 8px; padding: 10px 12px; margin-top: 10px;
+        font: 12.5px/1.55 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+        resize: vertical;
+      }
+      textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+      select {
+        background: var(--raised); border: 1px solid var(--line); color: var(--text);
+        border-radius: 8px; padding: 10px 12px; font: inherit;
+      }
+      .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #3a4050; }
+      .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+      @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
     </style>
   </head>
   <body>
@@ -90,6 +121,7 @@
       <a data-screen="catalogue">Catalogue</a>
       <a data-screen="device">Device</a>
       <a data-screen="install">Install</a>
+      <a data-screen="terminal">Terminal</a>
       <a data-screen="console">Console</a>
       <div class="device-chip" id="chip">No device selected</div>
     </nav>
@@ -142,6 +174,69 @@
         <div class="meta" id="progressText">Idle.</div>
       </section>
 
+      <section id="screen-terminal" hidden>
+        <h1>Terminal</h1>
+        <p class="sub">Talk to a board that is already running. For MicroPython this is the <code>&gt;&gt;&gt;</code> prompt — the same thing Thonny gives you, without leaving firmforge.</p>
+
+        <div class="row">
+          <select id="termPort"><option value="">No ports found</option></select>
+          <select id="termBaud">
+            <option value="115200" selected>115200</option>
+            <option value="9600">9600</option>
+            <option value="74880">74880</option>
+            <option value="230400">230400</option>
+            <option value="921600">921600</option>
+          </select>
+          <button id="termConnect">Connect</button>
+          <button class="ghost small" id="termRescan">Rescan</button>
+        </div>
+
+        <div id="termStatus" class="meta" style="margin-top:10px"><span class="dot"></span> Not connected.</div>
+
+        <div id="term"></div>
+
+        <div class="row" style="margin-top:10px">
+          <input type="text" id="termInput" placeholder="Type a command and press Enter…" autocomplete="off" spellcheck="false" disabled />
+          <button id="termSend" disabled>Send</button>
+        </div>
+
+        <div class="row" style="margin-top:10px; flex-wrap:wrap">
+          <button class="ghost small" id="termInterrupt" disabled title="Ctrl-C">Interrupt (Ctrl-C)</button>
+          <button class="ghost small" id="termReboot" disabled title="Ctrl-D">Soft reboot (Ctrl-D)</button>
+          <button class="ghost small" id="termReset" disabled>Hardware reset</button>
+          <button class="ghost small" id="termProbe" disabled>Identify firmware</button>
+          <button class="ghost small" id="termClear">Clear</button>
+        </div>
+
+        <div class="split" style="margin-top:22px">
+          <div>
+            <h2>Run a script</h2>
+            <p class="meta">Sent through MicroPython's raw REPL, so indentation survives and a traceback comes back separately from what the script printed.</p>
+            <textarea id="termScript" spellcheck="false" placeholder="from machine import Pin&#10;led = Pin(48, Pin.OUT)&#10;led.on()&#10;print('on')"></textarea>
+            <div class="row" style="margin-top:10px">
+              <button id="termRun" disabled>Run on board</button>
+            </div>
+            <div id="termRunOut"></div>
+          </div>
+
+          <div>
+            <h2>Put a file on the board</h2>
+            <p class="meta">Saved to the board's own filesystem and checked afterwards against its size and SHA-256. Name it <code>main.py</code> and it runs every time the board powers on.</p>
+            <div class="row" style="margin-top:10px">
+              <input type="text" id="termPath" value="main.py" spellcheck="false" />
+              <button class="ghost small" id="termPickFile">Load a file…</button>
+            </div>
+            <textarea id="termFile" spellcheck="false" placeholder="The contents to save. Loading a file fills this in, and you can edit it before sending."></textarea>
+            <div class="row" style="margin-top:10px">
+              <button id="termUpload" disabled>Save to board</button>
+              <button class="ghost small" id="termUploadRun" disabled>Save and reboot</button>
+            </div>
+            <div class="bar"><div id="uploadBar"></div></div>
+            <div class="meta" id="uploadText">Nothing sent yet.</div>
+          </div>
+        </div>
+      </section>
+
       <section id="screen-console" hidden>
         <h1>Console</h1>
         <p class="sub">Everything firmforge did, in order.</p>
@@ -180,7 +275,7 @@
       document.querySelectorAll("nav a").forEach((a) => {
         a.addEventListener("click", () => show(a.dataset.screen));
       });
-      const SCREENS = ["chips", "sources", "catalogue", "device", "install", "console"];
+      const SCREENS = ["chips", "sources", "catalogue", "device", "install", "terminal", "console"];
       function show(name) {
         document.querySelectorAll("nav a").forEach((a) =>
           a.setAttribute("aria-current", a.dataset.screen === name ? "page" : "false"));
@@ -452,6 +547,7 @@
         try {
           state.device = await invoke("detect_device", { port: port });
           log("Identified " + state.device.identity.chipFamily + " on " + port + ".");
+          syncTerminal();
           if (state.device.identity.chipFamily) {
             state.family = state.device.identity.chipFamily;
             localStorage.setItem("family", state.family);
@@ -613,13 +709,310 @@
         }
       }
 
+      // ── terminal ───────────────────────────────────────────────
+      // A live connection to a board that is already running, as opposed to the
+      // bootloader that flashing talks to. Output arrives on the `serial` event
+      // as it happens, so the pane behaves like a terminal rather than a report.
+      const term = {
+        connected: false,
+        port: null,
+        // Kept so the pane can be trimmed without re-rendering everything.
+        lines: 0,
+        history: [],
+        historyAt: -1,
+      };
+
+      function termWrite(text, cls) {
+        const el = $("term");
+        const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+        const node = document.createElement("span");
+        if (cls) node.className = cls;
+        node.textContent = text;
+        el.appendChild(node);
+
+        // A board in a print loop will grow this without bound and eventually
+        // make the app unusable, so old output is dropped.
+        if (++term.lines > 4000) {
+          while (el.childNodes.length > 2000) el.removeChild(el.firstChild);
+          term.lines = el.childNodes.length;
+        }
+        // Only follow the tail if the user has not scrolled up to read.
+        if (atBottom) el.scrollTop = el.scrollHeight;
+      }
+
+      function termStatus(text, cls) {
+        $("termStatus").innerHTML =
+          '<span class="dot" style="background:' +
+          (cls === "ok" ? "var(--ok)" : cls === "bad" ? "var(--bad)" : "#3a4050") +
+          '"></span> ' + esc(text);
+      }
+
+      function termEnabled(on) {
+        term.connected = on;
+        ["termInput", "termSend", "termInterrupt", "termReboot", "termReset",
+         "termProbe", "termRun", "termUpload", "termUploadRun"].forEach((id) => {
+          $(id).disabled = !on;
+        });
+        $("termConnect").textContent = on ? "Disconnect" : "Connect";
+      }
+
+      async function termRescan() {
+        const sel = $("termPort");
+        const previous = sel.value;
+        try {
+          const ports = await invoke("list_ports");
+          sel.innerHTML = ports.length
+            ? ports.map((p) =>
+                '<option value="' + esc(p.portName) + '">' + esc(p.portName) +
+                (p.product ? " — " + esc(p.product) : "") + "</option>").join("")
+            : '<option value="">No ports found</option>';
+          if (previous && ports.some((p) => p.portName === previous)) sel.value = previous;
+          else if (state.device && !state.device.demo &&
+                   ports.some((p) => p.portName === state.device.port)) {
+            sel.value = state.device.port;
+          }
+        } catch (e) {
+          log("Port scan failed: " + e);
+        }
+      }
+
+      async function termConnect() {
+        if (term.connected) {
+          await invoke("console_close");
+          termEnabled(false);
+          termStatus("Not connected.");
+          termWrite("\n— disconnected —\n", "note");
+          log("Closed the terminal on " + term.port + ".");
+          term.port = null;
+          return;
+        }
+
+        const port = $("termPort").value;
+        if (!port) { termStatus("Choose a port first.", "bad"); return; }
+        const baud = parseInt($("termBaud").value, 10);
+
+        $("termConnect").disabled = true;
+        try {
+          await invoke("console_open", { port: port, baud: baud });
+          term.port = port;
+          termEnabled(true);
+          termStatus("Connected to " + port + " at " + baud + " baud.", "ok");
+          termWrite("— connected to " + port + " at " + baud + " baud —\n", "note");
+          termWrite("Press Enter for a prompt, or Interrupt if a program is running.\n", "note");
+          log("Terminal open on " + port + " at " + baud + " baud.");
+          $("termInput").focus();
+        } catch (e) {
+          termStatus(String(e), "bad");
+          log("Could not open " + port + ": " + e);
+        } finally {
+          $("termConnect").disabled = false;
+        }
+      }
+
+      async function termSend() {
+        const input = $("termInput");
+        const text = input.value;
+        if (!text.trim()) { await invoke("console_control", { code: "enter" }); return; }
+        try {
+          await invoke("console_send", { text: text });
+          termWrite(text + "\n", "sent");
+          term.history.push(text);
+          term.historyAt = term.history.length;
+          input.value = "";
+        } catch (e) {
+          termWrite("\n" + e + "\n", "err");
+        }
+      }
+
+      async function termControl(code, note) {
+        try {
+          await invoke("console_control", { code: code });
+          if (note) termWrite("\n— " + note + " —\n", "note");
+        } catch (e) {
+          termWrite("\n" + e + "\n", "err");
+        }
+      }
+
+      async function termProbe() {
+        termWrite("\n— checking what is running on the board —\n", "note");
+        try {
+          const p = await invoke("console_probe");
+          if (!p.micropython) {
+            termWrite("No MicroPython REPL answered. The terminal still works for " +
+                      "watching output from whatever is running.\n", "note");
+            log("No MicroPython found on " + term.port + ".");
+            return;
+          }
+          const bits = [p.version, p.machine].filter(Boolean);
+          if (p.freeBytes != null) bits.push(kb(p.freeBytes) + " free on the filesystem");
+          termWrite(bits.join("\n") + "\n", "note");
+          log("MicroPython found on " + term.port + ".");
+        } catch (e) {
+          termWrite("\n" + e + "\n", "err");
+        }
+      }
+
+      async function termRun() {
+        const code = $("termScript").value;
+        if (!code.trim()) return;
+        const btn = $("termRun");
+        btn.disabled = true;
+        $("termRunOut").innerHTML = '<div class="banner info">Running on the board…</div>';
+        try {
+          const out = await invoke("console_run", { code: code });
+          const stdout = (out.stdout || "").trim();
+          const stderr = (out.stderr || "").trim();
+          $("termRunOut").innerHTML =
+            (stderr
+              ? '<div class="banner bad">The board raised an error.</div>'
+              : '<div class="banner info">Ran without errors.</div>') +
+            (stdout ? "<pre>" + esc(stdout) + "</pre>" : "") +
+            (stderr ? '<pre style="color:var(--bad)">' + esc(stderr) + "</pre>" : "");
+          log(stderr ? "Script raised an error on the board." : "Script ran on the board.");
+        } catch (e) {
+          $("termRunOut").innerHTML = '<div class="banner bad">' + esc(String(e)) + "</div>";
+        } finally {
+          btn.disabled = !term.connected;
+        }
+      }
+
+      async function termUpload(thenReboot) {
+        const path = $("termPath").value.trim();
+        const contents = $("termFile").value;
+        if (!path) { $("uploadText").textContent = "Give the file a name first."; return; }
+
+        $("termUpload").disabled = true;
+        $("termUploadRun").disabled = true;
+        $("uploadBar").style.width = "0%";
+        $("uploadText").textContent = "Sending…";
+        try {
+          const r = await invoke("console_upload", { path: path, contents: contents });
+          $("uploadBar").style.width = "100%";
+          if (r.verified) {
+            $("uploadText").textContent =
+              "Saved " + r.path + " — " + r.bytesOnDevice + " bytes, checked against the board's own SHA-256.";
+          } else if (r.sizeVerified) {
+            // hashlib is missing from some MicroPython builds; the size still
+            // proves the transfer was not truncated.
+            $("uploadText").textContent =
+              "Saved " + r.path + " — " + r.bytesOnDevice +
+              " bytes. This build has no hashlib, so only the size could be checked.";
+          } else {
+            $("uploadText").textContent =
+              "The board reports " + r.bytesOnDevice + " bytes but " + r.bytesSent +
+              " were sent. Something went wrong — do not rely on this file.";
+          }
+          log("Uploaded " + r.path + " (" + r.bytesOnDevice + " bytes).");
+
+          if (thenReboot) {
+            await invoke("console_control", { code: "softReboot" });
+            termWrite("\n— soft reboot, running " + path + " —\n", "note");
+            show("terminal");
+          }
+        } catch (e) {
+          $("uploadBar").style.width = "0%";
+          $("uploadText").textContent = String(e);
+          log("Upload failed: " + e);
+        } finally {
+          $("termUpload").disabled = !term.connected;
+          $("termUploadRun").disabled = !term.connected;
+        }
+      }
+
+      $("termConnect").addEventListener("click", termConnect);
+      $("termRescan").addEventListener("click", termRescan);
+      $("termSend").addEventListener("click", termSend);
+      $("termClear").addEventListener("click", () => { $("term").innerHTML = ""; term.lines = 0; });
+      $("termInterrupt").addEventListener("click", () => termControl("interrupt", "interrupted (Ctrl-C)"));
+      $("termReboot").addEventListener("click", () => termControl("softReboot", "soft reboot (Ctrl-D)"));
+      $("termReset").addEventListener("click", () => termControl("hardReset", "hardware reset"));
+      $("termProbe").addEventListener("click", termProbe);
+      $("termRun").addEventListener("click", termRun);
+      $("termUpload").addEventListener("click", () => termUpload(false));
+      $("termUploadRun").addEventListener("click", () => termUpload(true));
+
+      $("termInput").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); termSend(); return; }
+        // Ctrl-C in the input means "interrupt the board", as it would in any
+        // serial terminal — unless the user is copying a selection.
+        if (e.key === "c" && e.ctrlKey && !window.getSelection().toString()) {
+          e.preventDefault(); termControl("interrupt", "interrupted (Ctrl-C)"); return;
+        }
+        if (e.key === "d" && e.ctrlKey) {
+          e.preventDefault(); termControl("softReboot", "soft reboot (Ctrl-D)"); return;
+        }
+        if (e.key === "ArrowUp" && term.history.length) {
+          e.preventDefault();
+          term.historyAt = Math.max(0, term.historyAt - 1);
+          $("termInput").value = term.history[term.historyAt];
+        }
+        if (e.key === "ArrowDown" && term.history.length) {
+          e.preventDefault();
+          term.historyAt = Math.min(term.history.length, term.historyAt + 1);
+          $("termInput").value = term.history[term.historyAt] || "";
+        }
+      });
+
+      // Reading a file needs no plugin: the browser file picker hands over the
+      // text directly, which keeps the app free of filesystem permissions.
+      $("termPickFile").addEventListener("click", () => {
+        const picker = document.createElement("input");
+        picker.type = "file";
+        picker.accept = ".py,.txt,.json,.csv";
+        picker.addEventListener("change", () => {
+          const file = picker.files && picker.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            $("termFile").value = String(reader.result);
+            // Keep main.py if that is what they meant; otherwise use the real
+            // name, since uploading lib code as main.py would be surprising.
+            if ($("termPath").value.trim() === "main.py" && file.name !== "main.py") {
+              $("termPath").value = file.name;
+            }
+            $("uploadText").textContent = "Loaded " + file.name + " (" + kb(file.size) + "). Not sent yet.";
+          };
+          reader.readAsText(file);
+        });
+        picker.click();
+      });
+
+      // Re-read who holds the port. Flashing and identifying both take it back
+      // from the terminal, so the terminal's own buttons must stop claiming to
+      // be connected.
+      async function syncTerminal() {
+        try {
+          const held = await invoke("console_port");
+          if (!held && term.connected) {
+            termEnabled(false);
+            termStatus("Disconnected — the port was needed for the board itself.");
+            termWrite("\n— disconnected: firmforge needed " + term.port + " —\n", "note");
+            term.port = null;
+          }
+        } catch (e) {
+          // Nothing useful to say if even this fails.
+        }
+      }
+
       // ── flash events ───────────────────────────────────────────
       if (listen) {
+        // Board output, as it arrives.
+        listen("serial", ({ payload }) => termWrite(payload));
+
+        listen("upload", ({ payload }) => {
+          const pct = payload.totalBytes
+            ? Math.round((payload.sentBytes / payload.totalBytes) * 100) : 100;
+          $("uploadBar").style.width = pct + "%";
+          $("uploadText").textContent = pct + "% — " + payload.sentBytes +
+            " of " + payload.totalBytes + " bytes";
+        });
+
         listen("flash", ({ payload }) => {
           if (payload.kind === "started") {
             $("progress").style.width = "0%";
             $("progressText").textContent = "Writing " + payload.parts + " part(s), " +
               kb(payload.totalBytes) + (payload.demo ? " (demo)" : "") + "…";
+            syncTerminal();
           } else if (payload.kind === "partStarted") {
             log("Part " + payload.index + "/" + payload.parts + " at " + payload.offset +
                 " (" + kb(payload.sizeBytes) + ")");
@@ -660,6 +1053,7 @@
         }
         renderSources();
         await loadBuiltins();
+        await termRescan();
       }
     </script>
   </body>
