@@ -343,6 +343,34 @@ async fn detect_device(
     })
 }
 
+/// What firmware is on the board *right now*, before anything is overwritten.
+///
+/// This is the question people actually have when they pick up an unlabelled
+/// board. It opens the port, interrupts whatever is running and asks; nothing
+/// is written, and the connection is dropped again immediately.
+///
+/// The console used here throws output away rather than pushing it at the
+/// terminal, which may not be open — and if it is, the user did not ask to see
+/// a probe's protocol chatter in it.
+#[tauri::command]
+async fn identify_running(
+    state: tauri::State<'_, ConsoleState>,
+    port: String,
+    baud: Option<u32>,
+) -> Result<micropython::Probe, String> {
+    let baud = baud.unwrap_or(firmforge_flash::console::DEFAULT_BAUD);
+    // The probe needs the port to itself, same as flashing does.
+    release_port(&state, &port);
+
+    tokio::task::spawn_blocking(move || -> Result<micropython::Probe, String> {
+        let mut console = Console::open(&port, baud, |_| {}).map_err(|e| e.to_string())?;
+        micropython::interrupt(&mut console).map_err(|e| e.to_string())?;
+        Ok(micropython::probe(&mut console))
+    })
+    .await
+    .map_err(|e| format!("the board check stopped unexpectedly: {e}"))?
+}
+
 /// Run the install. Progress arrives on the `flash` event channel.
 ///
 /// `demo` writes nothing; it re-downloads, re-verifies and simulates the write
@@ -432,6 +460,7 @@ pub fn run() {
             load_builtin_sources,
             prepare_install,
             detect_device,
+            identify_running,
             console_open,
             console_close,
             console_port,

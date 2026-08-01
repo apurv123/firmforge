@@ -114,9 +114,12 @@ bricked.
 1. Install a build (below) and open firmforge. On a fresh install it asks once
    which chip you have — *ESP32-S3*. ESPHome, MicroPython, WLED and Tasmota load
    on their own. After that the chip lives in the top bar.
-2. **Device** → *Detect connected devices* → *Identify this device*. firmforge
-   reads the chip, revision, flash size and MAC from the silicon itself, and the
-   top bar shows what you are plugged into from then on.
+2. **Device** → firmforge scans on launch and, if exactly one recognisable board
+   is plugged in, identifies it by itself. Otherwise pick the port and press
+   *Identify this device*. Either way it reads the chip, revision, flash size
+   and MAC from the silicon itself, and the top bar shows what you are plugged
+   into from then on. *What is on this board?* tells you which firmware is
+   already there before you overwrite it.
 3. **Flash** → *Install* on **MicroPython**, then *Flash*. Builds meant for
    another chip stay dimmed, and firmforge refuses one even if you force it.
 4. **Playground** → pick the same port → *Connect* → *Interrupt (Ctrl-C)*. The
