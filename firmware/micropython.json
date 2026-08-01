@@ -1,0 +1,152 @@
+{
+  "name": "MicroPython",
+  "version": "v1.28.0",
+  "channel": "stable",
+  "releaseNotesUrl": "https://github.com/micropython/micropython/releases/tag/v1.28.0",
+  "homepage": "https://micropython.org",
+
+  "_comment": [
+    "MicroPython publishes bare .bin files on micropython.org/download rather",
+    "than an installer manifest, so firmforge maintains one. Every part below",
+    "points at micropython.org's own resources/firmware URL — nothing is",
+    "rehosted here, so no redistribution takes place and the SHA-256 values are",
+    "a genuine integrity check on upstream's artifact rather than a checksum of",
+    "our own copy. See plan/spec/legal-and-licensing.md.",
+    "",
+    "Digests and sizes were taken by downloading each file from micropython.org",
+    "on 2026-08-02 and hashing it, not copied from a page that could be stale.",
+    "",
+    "Offsets follow micropython.org's own esptool instructions, which differ by",
+    "chip: ESP32 and ESP32-S2 place the image at 0x1000, while the S3, C3 and C6",
+    "place it at 0x0. Getting this wrong produces a board that does not boot,",
+    "which is why they are written out per build rather than defaulted.",
+    "",
+    "MicroPython is MIT licensed. Flashing it replaces whatever was on the board",
+    "with a Python interpreter that waits at a >>> prompt; firmforge's Terminal",
+    "screen is how you talk to it afterwards."
+  ],
+
+  "builds": [
+    {
+      "chipFamily": "ESP32-S3",
+      "serialType": "cdc",
+      "variant": "Generic ESP32-S3",
+      "boardIds": ["esp32-s3-devkitc-1"],
+      "capabilities": ["wifi", "ble"],
+      "constraints": {
+        "minFlashSize": 4194304
+      },
+      "parts": [
+        {
+          "path": "https://micropython.org/resources/firmware/ESP32_GENERIC_S3-20260406-v1.28.0.bin",
+          "offset": 0,
+          "sha256": "8c6039d40024cae3c6b04bb434f77901548f5487df9789af15548c54f9e11d7f"
+        }
+      ]
+    },
+    {
+      "chipFamily": "ESP32-S3",
+      "serialType": "cdc",
+      "variant": "Generic ESP32-S3 with octal SPIRAM",
+      "boardIds": ["esp32-s3-devkitc-1-n8r8"],
+      "capabilities": ["wifi", "ble", "psram"],
+      "constraints": {
+        "minFlashSize": 8388608,
+        "psramRequired": true
+      },
+      "parts": [
+        {
+          "path": "https://micropython.org/resources/firmware/ESP32_GENERIC_S3-SPIRAM_OCT-20260406-v1.28.0.bin",
+          "offset": 0,
+          "sha256": "67c19ae123d84152019b57526ed5291dd0a2b4edd87655c5f76b46c9a62ff5dd"
+        }
+      ]
+    },
+    {
+      "chipFamily": "ESP32",
+      "serialType": "uart",
+      "variant": "Generic ESP32",
+      "boardIds": ["esp32-devkitc"],
+      "capabilities": ["wifi", "ble"],
+      "constraints": {
+        "minFlashSize": 4194304
+      },
+      "parts": [
+        {
+          "path": "https://micropython.org/resources/firmware/ESP32_GENERIC-20260406-v1.28.0.bin",
+          "offset": 4096,
+          "sha256": "cd7820d02c35d34dd403b44263129c6a511b350aea8446c229890753fe240784"
+        }
+      ]
+    },
+    {
+      "chipFamily": "ESP32",
+      "serialType": "uart",
+      "variant": "Generic ESP32 with SPIRAM",
+      "boardIds": ["esp32-wrover"],
+      "capabilities": ["wifi", "ble", "psram"],
+      "constraints": {
+        "minFlashSize": 4194304,
+        "psramRequired": true
+      },
+      "parts": [
+        {
+          "path": "https://micropython.org/resources/firmware/ESP32_GENERIC-SPIRAM-20260406-v1.28.0.bin",
+          "offset": 4096,
+          "sha256": "cd6b90b2c0874c0361a632f0f540e8efdcfbcf8ef72103369295b0e92fee8b55"
+        }
+      ]
+    },
+    {
+      "chipFamily": "ESP32-C3",
+      "serialType": "cdc",
+      "variant": "Generic ESP32-C3",
+      "boardIds": ["esp32-c3-devkitm-1"],
+      "capabilities": ["wifi", "ble"],
+      "constraints": {
+        "minFlashSize": 4194304
+      },
+      "parts": [
+        {
+          "path": "https://micropython.org/resources/firmware/ESP32_GENERIC_C3-20260406-v1.28.0.bin",
+          "offset": 0,
+          "sha256": "c749c22b6fe00cb8211a3b227ed6c0ce9babb518fd8f5a661f7496eb878fa895"
+        }
+      ]
+    },
+    {
+      "chipFamily": "ESP32-C6",
+      "serialType": "cdc",
+      "variant": "Generic ESP32-C6",
+      "boardIds": ["esp32-c6-devkitc-1"],
+      "capabilities": ["wifi", "ble"],
+      "constraints": {
+        "minFlashSize": 4194304
+      },
+      "parts": [
+        {
+          "path": "https://micropython.org/resources/firmware/ESP32_GENERIC_C6-20260406-v1.28.0.bin",
+          "offset": 0,
+          "sha256": "d338042d2dd87a00dad2163071f44bf67da1401e1d1d0686f2bb2e336e78f0e6"
+        }
+      ]
+    },
+    {
+      "chipFamily": "ESP32-S2",
+      "serialType": "cdc",
+      "variant": "Generic ESP32-S2",
+      "boardIds": ["esp32-s2-saola-1"],
+      "capabilities": ["wifi"],
+      "constraints": {
+        "minFlashSize": 4194304
+      },
+      "parts": [
+        {
+          "path": "https://micropython.org/resources/firmware/ESP32_GENERIC_S2-20260406-v1.28.0.bin",
+          "offset": 4096,
+          "sha256": "7db1a73db7e96697a4292b8dec347a0e1517349d74410489293fd2f29f6ab515"
+        }
+      ]
+    }
+  ]
+}

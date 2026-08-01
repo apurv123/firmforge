@@ -43,8 +43,8 @@ produced by CI — see [Installing and testing](#installing-and-testing).
 - Pick your chip family first. ESP32-S3 is supported; the other six ESP32-class
   families are listed and marked unsupported rather than hidden, so you find out
   before you install, not after
-- Start with firmware already there. ESPHome, WLED and Tasmota are added on
-  first run, so there is something to browse before you have configured
+- Start with firmware already there. ESPHome, MicroPython, WLED and Tasmota are
+  added on first run, so there is something to browse before you have configured
   anything. Bruce and ESP32 Marauder are listed but not added — they are
   security-testing tools, so adding them is a deliberate choice
 - Remove any built-in source you do not want; the removal sticks, and
@@ -65,6 +65,11 @@ produced by CI — see [Installing and testing](#installing-and-testing).
 - **Flash a real ESP32** over USB: firmforge identifies the chip by talking to
   its ROM bootloader, refuses any build meant for a different chip, writes each
   part, and reads it back to confirm what landed
+- **Talk to the board afterwards.** The Terminal screen is a real serial
+  console: watch output, type at the prompt, interrupt a running program with
+  Ctrl-C, soft reboot with Ctrl-D. On MicroPython it also runs scripts and
+  saves files to the board — name one `main.py` and it runs on every power-up.
+  That is the job people currently install Thonny for.
 
 **What does not work yet**
 
@@ -109,7 +114,7 @@ bricked.
 ### Try it in five clicks
 
 1. Install a build (below) and open firmforge.
-2. **Chip** → *ESP32-S3*. ESPHome, WLED and Tasmota load on their own.
+2. **Chip** → *ESP32-S3*. ESPHome, MicroPython, WLED and Tasmota load on their own.
 3. **Sources** → *Also available* → *Add* on **ESP32 Marauder**.
 4. **Device** → *Use demo device*, or plug a board in and use
    *Detect connected devices* → *Identify this device*. Then **Catalogue** →
@@ -121,6 +126,23 @@ bricked.
 That downloads ~1.5 MB of real ESP32 Marauder firmware from Marauder's own
 release page, verifies all four SHA-256 digests, and simulates the write.
 Nothing is written to any hardware.
+
+### With a real board: firmware, then Python, without leaving the app
+
+1. **Chip** → *ESP32-S3*, then **Device** → *Detect connected devices* →
+   *Identify this device*. firmforge reads the chip, revision, flash size and
+   MAC from the silicon itself.
+2. **Catalogue** → *Install* on **MicroPython**, then *Flash*. Builds meant for
+   another chip stay dimmed, and firmforge refuses one even if you force it.
+3. **Terminal** → pick the same port → *Connect* → *Interrupt (Ctrl-C)*. The
+   `>>>` prompt appears. Type `print(2 ** 10)` and press Enter.
+4. Paste a script into **Run a script** and press *Run on board*. Indentation
+   survives, and an exception comes back as an error rather than being lost in
+   the output.
+5. Put it in **Put a file on the board** as `main.py` and press *Save and
+   reboot*. It now runs every time the board powers on.
+
+Steps 3 to 5 are what Thonny is normally installed for.
 
 ### Option A — install a prebuilt binary (no toolchain needed)
 

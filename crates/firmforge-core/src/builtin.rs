@@ -116,6 +116,32 @@ pub fn all() -> Vec<BuiltinSource> {
             caution: None,
         },
         BuiltinSource {
+            id: "micropython".into(),
+            name: "MicroPython".into(),
+            summary: "A Python interpreter that runs on the board itself. Flash it \
+                      once, then write and change code from firmforge's Terminal \
+                      without reflashing. Upstream publishes bare .bin files with \
+                      no manifest, so firmforge maintains one that points at \
+                      micropython.org's own downloads."
+                .into(),
+            locator: Locator::ManifestUrl(
+                "https://raw.githubusercontent.com/apurv123/firmforge/main/firmware/micropython.json"
+                    .into(),
+            ),
+            tier: Tier::Bundled,
+            availability: Availability::Ready,
+            license: "MIT".into(),
+            families: vec![
+                "ESP32".into(),
+                "ESP32-C3".into(),
+                "ESP32-C6".into(),
+                "ESP32-S2".into(),
+                "ESP32-S3".into(),
+            ],
+            homepage: "https://micropython.org".into(),
+            caution: None,
+        },
+        BuiltinSource {
             id: "wled".into(),
             name: "WLED".into(),
             summary: "Addressable LED control over WiFi. One of the most widely \
@@ -338,6 +364,56 @@ mod tests {
                     source.name
                 );
             }
+        }
+    }
+
+    /// MicroPython is the reason firmforge has a terminal at all: flashing it
+    /// leaves a Python prompt rather than a finished appliance, so the two
+    /// features only make sense together.
+    #[test]
+    fn micropython_is_available_on_first_run() {
+        let mpy = find("micropython").expect("MicroPython should be a built-in source");
+        assert_eq!(mpy.tier, Tier::Bundled);
+        assert!(mpy.can_add());
+        assert!(mpy.families.iter().any(|f| f == "ESP32-S3"));
+    }
+
+    /// The manifest firmforge maintains for MicroPython is the authority on
+    /// where each image lands in flash, and the offsets are not the same across
+    /// the family: ESP32 and ESP32-S2 boot from 0x1000, everything newer from
+    /// 0x0. A wrong offset here is a board that no longer boots, so the values
+    /// are pinned rather than trusted to stay right through an edit.
+    #[test]
+    fn micropython_offsets_match_upstreams_flashing_instructions() {
+        let raw = include_str!("../../../firmware/micropython.json");
+        let manifest = crate::manifest::Manifest::from_json(raw.as_bytes())
+            .expect("the MicroPython manifest firmforge ships must parse");
+
+        assert!(!manifest.builds.is_empty());
+        for build in &manifest.builds {
+            let expected = match build.chip_family.as_str() {
+                "ESP32" | "ESP32-S2" => 0x1000,
+                _ => 0x0,
+            };
+            let part = build
+                .parts
+                .first()
+                .unwrap_or_else(|| panic!("{} has no parts", build.chip_family));
+            assert_eq!(
+                part.offset, expected,
+                "{} {:?} should flash at {expected:#x}",
+                build.chip_family, build.variant
+            );
+            assert!(
+                part.sha256.is_some(),
+                "{} must carry a digest — it is the only integrity check on someone \
+                 else's binary",
+                build.chip_family
+            );
+            assert!(
+                part.path.starts_with("https://micropython.org/"),
+                "parts must point at upstream rather than a rehosted copy"
+            );
         }
     }
 }
