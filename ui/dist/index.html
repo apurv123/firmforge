@@ -149,6 +149,27 @@
         border-radius: 8px; padding: 10px 12px; font: inherit;
       }
       .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #3a4050; }
+      /* Several containers set display explicitly, which silently beats the
+         hidden attribute. Nothing marked hidden should ever be on screen. */
+      [hidden] { display: none !important; }
+
+      /* The connection is the precondition for everything on this screen, so it
+         sits above the tabs rather than inside one of them. */
+      .connbar {
+        display: flex; align-items: center; justify-content: space-between; gap: 16px;
+        background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+        padding: 12px 16px; margin-top: 16px;
+      }
+      .subtabs { display: flex; gap: 4px; margin: 20px 0 4px; border-bottom: 1px solid var(--line); }
+      .subtab {
+        background: none; border: none; border-bottom: 2px solid transparent;
+        color: var(--muted); padding: 9px 14px; border-radius: 0; font: inherit; font-size: 13px;
+      }
+      .subtab:hover { color: var(--text); }
+      .subtab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+      /* Editors read badly at full window width; the prompt does not. */
+      #pane-script, #pane-files { max-width: 880px; }
+      #pane-script h2:first-child, #pane-files h2:first-child { margin-top: 20px; }
       .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
       @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
 
@@ -311,7 +332,18 @@
         <h1>Playground</h1>
         <p class="sub">Talk to a board that is already running. For MicroPython this is the <code>&gt;&gt;&gt;</code> prompt — the same thing Thonny gives you, without leaving firmforge.</p>
 
-        <div class="row">
+        <div class="connbar">
+          <div>
+            <div id="termStatus" class="meta"><span class="dot"></span> Not connected.</div>
+            <div class="meta" id="termHint">Connect to open a live session with the board.</div>
+          </div>
+          <div class="row">
+            <button id="termConnect">Connect</button>
+            <button class="ghost small" id="termAdvanced">Port &amp; speed</button>
+          </div>
+        </div>
+
+        <div class="row" id="termAdvancedRow" hidden style="margin-top:10px">
           <select id="termPort"><option value="">No ports found</option></select>
           <select id="termBaud">
             <option value="115200" selected>115200</option>
@@ -320,53 +352,60 @@
             <option value="230400">230400</option>
             <option value="921600">921600</option>
           </select>
-          <button id="termConnect">Connect</button>
           <button class="ghost small" id="termRescan">Rescan</button>
         </div>
 
-        <div id="termStatus" class="meta" style="margin-top:10px"><span class="dot"></span> Not connected.</div>
-
-        <div id="term"></div>
-
-        <div class="row" style="margin-top:10px">
-          <input type="text" id="termInput" placeholder="Type a command and press Enter…" autocomplete="off" spellcheck="false" disabled />
-          <button id="termSend" disabled>Send</button>
+        <!-- Three things happen here, and only one at a time: type at the
+             prompt, run a script, or put a file on the board. Sub-tabs keep the
+             other two out of the way instead of stacking them all down one
+             very long page. -->
+        <div class="subtabs" role="tablist">
+          <button class="subtab" data-pane="repl" role="tab" aria-selected="true">Prompt</button>
+          <button class="subtab" data-pane="script" role="tab" aria-selected="false">Run a script</button>
+          <button class="subtab" data-pane="files" role="tab" aria-selected="false">Files</button>
         </div>
 
-        <div class="row" style="margin-top:10px; flex-wrap:wrap">
-          <button class="ghost small" id="termInterrupt" disabled title="Ctrl-C">Interrupt (Ctrl-C)</button>
-          <button class="ghost small" id="termReboot" disabled title="Ctrl-D">Soft reboot (Ctrl-D)</button>
-          <button class="ghost small" id="termReset" disabled>Hardware reset</button>
-          <button class="ghost small" id="termProbe" disabled>Identify firmware</button>
-          <button class="ghost small" id="termClear">Clear</button>
+        <div id="pane-repl">
+          <div id="term"></div>
+
+          <div class="row" style="margin-top:10px">
+            <input type="text" id="termInput" placeholder="Type a command and press Enter…" autocomplete="off" spellcheck="false" disabled />
+            <button id="termSend" disabled>Send</button>
+          </div>
+
+          <div class="row" style="margin-top:10px; flex-wrap:wrap">
+            <button class="ghost small" id="termInterrupt" disabled title="Ctrl-C">Interrupt (Ctrl-C)</button>
+            <button class="ghost small" id="termReboot" disabled title="Ctrl-D">Soft reboot (Ctrl-D)</button>
+            <button class="ghost small" id="termReset" disabled>Hardware reset</button>
+            <button class="ghost small" id="termProbe" disabled>Identify firmware</button>
+            <button class="ghost small" id="termClear">Clear</button>
+          </div>
         </div>
 
-        <div class="split" style="margin-top:22px">
-          <div>
-            <h2>Run a script</h2>
-            <p class="meta">Sent through MicroPython's raw REPL, so indentation survives and a traceback comes back separately from what the script printed.</p>
-            <textarea id="termScript" spellcheck="false" placeholder="from machine import Pin&#10;led = Pin(48, Pin.OUT)&#10;led.on()&#10;print('on')"></textarea>
-            <div class="row" style="margin-top:10px">
-              <button id="termRun" disabled>Run on board</button>
-            </div>
-            <div id="termRunOut"></div>
+        <div id="pane-script" hidden>
+          <h2>Run a script</h2>
+          <p class="meta">Sent through MicroPython's raw REPL, so indentation survives and a traceback comes back separately from what the script printed.</p>
+          <textarea id="termScript" spellcheck="false" placeholder="from machine import Pin&#10;led = Pin(48, Pin.OUT)&#10;led.on()&#10;print('on')"></textarea>
+          <div class="row" style="margin-top:10px">
+            <button id="termRun" disabled>Run on board</button>
           </div>
+          <div id="termRunOut"></div>
+        </div>
 
-          <div>
-            <h2>Put a file on the board</h2>
-            <p class="meta">Saved to the board's own filesystem and checked afterwards against its size and SHA-256. Name it <code>main.py</code> and it runs every time the board powers on.</p>
-            <div class="row" style="margin-top:10px">
-              <input type="text" id="termPath" value="main.py" spellcheck="false" />
-              <button class="ghost small" id="termPickFile">Load a file…</button>
-            </div>
-            <textarea id="termFile" spellcheck="false" placeholder="The contents to save. Loading a file fills this in, and you can edit it before sending."></textarea>
-            <div class="row" style="margin-top:10px">
-              <button id="termUpload" disabled>Save to board</button>
-              <button class="ghost small" id="termUploadRun" disabled>Save and reboot</button>
-            </div>
-            <div class="bar"><div id="uploadBar"></div></div>
-            <div class="meta" id="uploadText">Nothing sent yet.</div>
+        <div id="pane-files" hidden>
+          <h2>Put a file on the board</h2>
+          <p class="meta">Saved to the board's own filesystem and checked afterwards against its size and SHA-256. Name it <code>main.py</code> and it runs every time the board powers on.</p>
+          <div class="row" style="margin-top:10px">
+            <input type="text" id="termPath" value="main.py" spellcheck="false" />
+            <button class="ghost small" id="termPickFile">Load a file…</button>
           </div>
+          <textarea id="termFile" spellcheck="false" placeholder="The contents to save. Loading a file fills this in, and you can edit it before sending."></textarea>
+          <div class="row" style="margin-top:10px">
+            <button id="termUpload" disabled>Save to board</button>
+            <button class="ghost small" id="termUploadRun" disabled>Save and reboot</button>
+          </div>
+          <div class="bar"><div id="uploadBar"></div></div>
+          <div class="meta" id="uploadText">Nothing sent yet.</div>
         </div>
       </section>
 
@@ -830,6 +869,7 @@
         // Connecting a board is exactly the thing that unlocks the Flash
         // button, so a review left open should notice.
         if (!$("reviewDrawer").hidden && state.phase === "ready") renderReview();
+        termRefreshConn();
       }
 
       // What is on the board already — asked before it gets overwritten.
@@ -1235,7 +1275,40 @@
          "termProbe", "termRun", "termUpload", "termUploadRun"].forEach((id) => {
           $(id).disabled = !on;
         });
-        $("termConnect").textContent = on ? "Disconnect" : "Connect";
+        termRefreshConn();
+      }
+
+      // The board is chosen once, in the top bar. This screen leads with the
+      // single action and keeps port and speed behind a disclosure, for the
+      // times the obvious guess is the wrong one.
+      function termTargetPort() {
+        const sel = $("termPort");
+        if (sel.value) return sel.value;
+        return state.device ? state.device.port : "";
+      }
+
+      function termRefreshConn() {
+        const btn = $("termConnect");
+        if (term.connected) {
+          btn.textContent = "Disconnect";
+          btn.disabled = false;
+          $("termHint").textContent = "Anything the board prints appears under Prompt as it happens.";
+          return;
+        }
+        const p = termTargetPort();
+        btn.textContent = p ? "Connect to " + p : "Connect";
+        btn.disabled = !p;
+        $("termHint").textContent = p
+          ? "Opens a live session on " + p + " at " + $("termBaud").value + " baud."
+          : "No serial port found. Plug a board in, then rescan under Port & speed.";
+      }
+
+      const PANES = ["repl", "script", "files"];
+      function showPane(name) {
+        PANES.forEach((p) => { $("pane-" + p).hidden = p !== name; });
+        document.querySelectorAll(".subtab").forEach((b) =>
+          b.setAttribute("aria-selected", b.dataset.pane === name ? "true" : "false"));
+        if (name === "repl" && term.connected) $("termInput").focus();
       }
 
       async function termRescan() {
@@ -1256,6 +1329,7 @@
         } catch (e) {
           log("Port scan failed: " + e);
         }
+        termRefreshConn();
       }
 
       async function termConnect() {
@@ -1269,7 +1343,7 @@
           return;
         }
 
-        const port = $("termPort").value;
+        const port = termTargetPort();
         if (!port) { termStatus("Choose a port first.", "bad"); return; }
         const baud = parseInt($("termBaud").value, 10);
 
@@ -1287,7 +1361,7 @@
           termStatus(String(e), "bad");
           log("Could not open " + port + ": " + e);
         } finally {
-          $("termConnect").disabled = false;
+          termRefreshConn();
         }
       }
 
@@ -1403,6 +1477,16 @@
 
       $("termConnect").addEventListener("click", termConnect);
       $("termRescan").addEventListener("click", termRescan);
+      $("termBaud").addEventListener("change", termRefreshConn);
+      $("termPort").addEventListener("change", termRefreshConn);
+      $("termAdvanced").addEventListener("click", () => {
+        const row = $("termAdvancedRow");
+        row.hidden = !row.hidden;
+        $("termAdvanced").setAttribute("aria-expanded", String(!row.hidden));
+        if (!row.hidden) termRescan();
+      });
+      document.querySelectorAll(".subtab").forEach((b) =>
+        b.addEventListener("click", () => showPane(b.dataset.pane)));
       $("termSend").addEventListener("click", termSend);
       $("termClear").addEventListener("click", () => { $("term").innerHTML = ""; term.lines = 0; });
       $("termInterrupt").addEventListener("click", () => termControl("interrupt", "interrupted (Ctrl-C)"));
