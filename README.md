@@ -34,20 +34,40 @@ firmforge/
 
 [![ci](https://github.com/apurv123/firmforge/actions/workflows/ci.yml/badge.svg)](https://github.com/apurv123/firmforge/actions/workflows/ci.yml)
 
-**Milestone M0 — Skeleton: complete.** The workspace builds and 20 tests pass on Windows, macOS and Linux, and the desktop app has been built and launched successfully on all three platforms. See [Installing and testing](#installing-and-testing) to try it.
+The **desktop app works end to end, except for the final write to hardware.**
+Builds and tests are green on Windows, macOS and Linux, and installers are
+produced by CI — see [Installing and testing](#installing-and-testing).
 
-It is **not yet a usable flasher**: the app enumerates serial ports and renders the
-first screen, but no firmware can be written to a device until M2.
+**What works today**
 
-Implemented so far:
+- Add a GitHub repository as a firmware source, by `owner/repo` or URL
+- Read `firmware/manifest.json` from its default branch, and `manifest.json`
+  assets attached to its releases
+- Browse a catalogue of every build, checked against the selected device, with
+  plain-language reasons when something does not fit ("needs 8 MB flash, yours
+  has 4 MB") rather than silently hiding it
+- Download every part and verify its SHA-256 **before** anything is written; a
+  mismatch refuses the install rather than warning
+- See exactly where each byte comes from, and whether it is the publisher's own
+  release asset or a rehosted copy
+- Run the whole thing against a **demo device**, so the workflow can be tried
+  without owning an ESP32 and without writing to anything
 
-- **`firmforge-core`** — the ESP Web Tools-compatible manifest format plus firmforge extensions (channels, per-part SHA-256, signatures, constraints, variants, assets), device identity, compatibility matching with plain-language reasons, and artifact verification.
+**What does not work yet**
+
+- Writing to real hardware. `espflash` is not wired in, so selecting a real
+  serial port will tell you so rather than pretending.
+- The mobile app. The shared crates are structured for it, but no Android or
+  iOS project exists yet.
+- Signature verification, rollback, and the serial console.
+
+**Crates**
+
+- **`firmforge-core`** — the ESP Web Tools-compatible manifest format plus firmforge extensions (channels, per-part SHA-256, signatures, constraints, variants, assets), device identity, compatibility matching, part URL resolution and artifact verification.
 - **`firmforge-flash`** — transport abstraction across USB serial / Android USB host / BLE / OTA, USB-to-UART bridge identification for the driver doctor, and desktop serial enumeration.
-- **`firmforge-app`** — the shared command surface used by both shells (and, later, a headless CLI).
-- **`apps/desktop`** — a Tauri v2 shell rendering spec screen D2 and calling the real `list_ports` command.
-- **`firmware/`** — the repository convention with a worked, parsed-in-tests manifest.
-
-Next: **M1 — Read** (GitHub sourcing, catalogue UI, cache). See the [roadmap](plan/spec/firmforge-spec.md#11-roadmap).
+- **`firmforge-app`** — GitHub sourcing, install preparation and the shared command surface used by both shells.
+- **`apps/desktop`** — the Tauri v2 shell.
+- **`firmware/`** — the repository convention, as a worked example that describes real published firmware and is checked in tests.
 
 ## Documentation
 
@@ -61,9 +81,23 @@ Next: **M1 — Read** (GitHub sourcing, catalogue UI, cache). See the [roadmap](
 
 ## Installing and testing
 
-> **What you get today:** the app opens screen D2 and enumerates real serial ports.
-> It cannot flash a device yet — that arrives in M2. Treat this as a walking
-> skeleton, not a tool.
+> **What you get today:** the full workflow — add a GitHub source, browse a
+> catalogue, download and verify firmware — against a demo device. Writing to
+> real hardware is not implemented yet.
+
+### Try it in five clicks
+
+1. Install a build (below) and open firmforge.
+2. **Sources** → type `apurv123/firmforge` → *Add source*.
+3. **Device** → *Use demo device*.
+4. **Catalogue** → *Install* on the ESP32-S3 build. The ESP32 build beside it
+   stays dimmed, and tells you why.
+5. **Install** → check the parts table, then *Run demo install*, and watch the
+   **Console**.
+
+That downloads ~1.5 MB of real ESP32 Marauder firmware from Marauder's own
+release page, verifies all four SHA-256 digests, and simulates the write.
+Nothing is written to any hardware.
 
 ### Option A — install a prebuilt binary (no toolchain needed)
 
