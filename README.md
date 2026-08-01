@@ -40,12 +40,22 @@ produced by CI — see [Installing and testing](#installing-and-testing).
 
 **What works today**
 
-- Add a GitHub repository as a firmware source, by `owner/repo` or URL
-- Read `firmware/manifest.json` from its default branch, and `manifest.json`
-  assets attached to its releases
-- Browse a catalogue of every build, checked against the selected device, with
-  plain-language reasons when something does not fit ("needs 8 MB flash, yours
-  has 4 MB") rather than silently hiding it
+- Pick your chip family first. ESP32-S3 is supported; the other six ESP32-class
+  families are listed and marked unsupported rather than hidden, so you find out
+  before you install, not after
+- Start with firmware already there. ESPHome, WLED and Tasmota are added on
+  first run, so there is something to browse before you have configured
+  anything. Bruce and ESP32 Marauder are listed but not added — they are
+  security-testing tools, so adding them is a deliberate choice
+- Remove any built-in source you do not want; the removal sticks, and
+  restore-defaults brings them back
+- Add your own source, by `owner/repo` or by a link to a published
+  `manifest.json` — most projects publish theirs outside their repository
+- Read `firmware/manifest.json` from a repository's default branch, and
+  `manifest.json` assets attached to its releases
+- Browse a catalogue of every build, filtered to your chip and checked against
+  the selected device, with plain-language reasons when something does not fit
+  ("needs 8 MB flash, yours has 4 MB") rather than silently hiding it
 - Download every part and verify its SHA-256 **before** anything is written; a
   mismatch refuses the install rather than warning
 - See exactly where each byte comes from, and whether it is the publisher's own
@@ -60,6 +70,16 @@ produced by CI — see [Installing and testing](#installing-and-testing).
 - The mobile app. The shared crates are structured for it, but no Android or
   iOS project exists yet.
 - Signature verification, rollback, and the serial console.
+
+**About those built-in sources**
+
+They are a snapshot taken at release, and some publishers pin a version into the
+URL, so a few will go stale. firmforge refetches them on every launch rather
+than caching, so staleness is visible: a source that no longer loads says so in
+plain language, with the date the list was checked, and can be removed. Bruce is
+listed but cannot be installed at all — it publishes bare `.bin` files with no
+manifest, so the flash offsets are unknown, and guessing them is how boards get
+bricked.
 
 **Crates**
 
@@ -81,17 +101,18 @@ produced by CI — see [Installing and testing](#installing-and-testing).
 
 ## Installing and testing
 
-> **What you get today:** the full workflow — add a GitHub source, browse a
-> catalogue, download and verify firmware — against a demo device. Writing to
+> **What you get today:** the full workflow — pick a chip, browse firmware that
+> is already there, download and verify it — against a demo device. Writing to
 > real hardware is not implemented yet.
 
 ### Try it in five clicks
 
 1. Install a build (below) and open firmforge.
-2. **Sources** → type `apurv123/firmforge` → *Add source*.
-3. **Device** → *Use demo device*.
-4. **Catalogue** → *Install* on the ESP32-S3 build. The ESP32 build beside it
-   stays dimmed, and tells you why.
+2. **Chip** → *ESP32-S3*. ESPHome, WLED and Tasmota load on their own.
+3. **Sources** → *Also available* → *Add* on **ESP32 Marauder**.
+4. **Device** → *Use demo device*. Then **Catalogue** → *Install* on the
+   ESP32-S3 Marauder build. The ESP32 build beside it stays dimmed, and tells
+   you why.
 5. **Install** → check the parts table, then *Run demo install*, and watch the
    **Console**.
 
