@@ -11,7 +11,9 @@ use firmforge_app::{
     DiscoveredManifest, Source, Target,
 };
 use firmforge_core::device::DeviceIdentity;
+use firmforge_flash::{micropython, Console, TransportError};
 use serde::Serialize;
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 
 /// Everything the user needs to see before confirming an install.
@@ -127,12 +129,205 @@ async fn prepare_install(
     })
 }
 
+/// The open serial console, if there is one.
+///
+/// A serial port can only be held by one program at a time, so this is also the
+/// interlock: flashing takes the port away from the console rather than failing
+/// halfway through with a permission error nobody can act on.
+#[derive(Default)]
+struct ConsoleState(Arc<Mutex<Option<Console>>>);
+
+/// Close the console if it is holding `port`. Returns true if it was.
+fn release_port(state: &ConsoleState, port: &str) -> bool {
+    let mut guard = match state.0.lock() {
+        Ok(g) => g,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    if guard.as_ref().is_some_and(|c| c.port_name() == port) {
+        // Dropping stops the reader thread and closes the handle.
+        *guard = None;
+        true
+    } else {
+        false
+    }
+}
+
+/// Run `f` against the open console.
+fn with_console<T>(
+    state: &ConsoleState,
+    f: impl FnOnce(&mut Console) -> Result<T, TransportError>,
+) -> Result<T, String> {
+    let mut guard = match state.0.lock() {
+        Ok(g) => g,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    let console = guard
+        .as_mut()
+        .ok_or_else(|| "Not connected to a board yet.".to_string())?;
+    f(console).map_err(|e| e.to_string())
+}
+
+/// Open a serial console and start streaming whatever the board says.
+#[tauri::command]
+fn console_open(
+    app: AppHandle,
+    state: tauri::State<'_, ConsoleState>,
+    port: String,
+    baud: Option<u32>,
+) -> Result<(), String> {
+    let baud = baud.unwrap_or(firmforge_flash::console::DEFAULT_BAUD);
+    let emitter = app.clone();
+    let console = Console::open(&port, baud, move |text| {
+        let _ = emitter.emit("serial", text);
+    })
+    .map_err(|e| e.to_string())?;
+
+    let mut guard = match state.0.lock() {
+        Ok(g) => g,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    // Assigning drops any previous console, releasing the port it held.
+    *guard = Some(console);
+    Ok(())
+}
+
+#[tauri::command]
+fn console_close(state: tauri::State<'_, ConsoleState>) {
+    let mut guard = match state.0.lock() {
+        Ok(g) => g,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    *guard = None;
+}
+
+/// The port the console currently holds, if any.
+#[tauri::command]
+fn console_port(state: tauri::State<'_, ConsoleState>) -> Option<String> {
+    let guard = match state.0.lock() {
+        Ok(g) => g,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    guard.as_ref().map(|c| c.port_name().to_string())
+}
+
+/// Send a line, as if it had been typed at the prompt.
+#[tauri::command]
+fn console_send(state: tauri::State<'_, ConsoleState>, text: String) -> Result<(), String> {
+    with_console(&state, |c| {
+        c.write(text.as_bytes())?;
+        c.write(b"\r\n")
+    })
+}
+
+/// Send one of the control codes a MicroPython user needs.
+///
+/// These are the keystrokes the Thonny instructions describe: Ctrl-C to break
+/// into a running program, Ctrl-D to soft reboot.
+#[tauri::command]
+fn console_control(state: tauri::State<'_, ConsoleState>, code: String) -> Result<(), String> {
+    with_console(&state, |c| match code.as_str() {
+        "interrupt" => micropython::interrupt(c),
+        "softReboot" => micropython::soft_reboot(c),
+        "hardReset" => c.hardware_reset(),
+        "enter" => c.write(b"\r\n"),
+        other => Err(TransportError::Io(format!(
+            "unknown console action {other}"
+        ))),
+    })
+}
+
+/// Ask the board whether MicroPython is running, and what it is.
+#[tauri::command]
+async fn console_probe(
+    state: tauri::State<'_, ConsoleState>,
+) -> Result<micropython::Probe, String> {
+    let shared = Arc::clone(&state.0);
+    tokio::task::spawn_blocking(move || {
+        let mut guard = match shared.lock() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        match guard.as_mut() {
+            Some(console) => Ok(micropython::probe(console)),
+            None => Err("Not connected to a board yet.".to_string()),
+        }
+    })
+    .await
+    .map_err(|e| format!("the board check stopped unexpectedly: {e}"))?
+}
+
+/// Run a snippet of Python on the board and return what it printed.
+///
+/// This goes through the raw REPL rather than being typed at the prompt, so
+/// multi-line code is not mangled by auto-indent and a traceback comes back
+/// separately from ordinary output.
+#[tauri::command]
+async fn console_run(
+    state: tauri::State<'_, ConsoleState>,
+    code: String,
+) -> Result<micropython::ExecOutput, String> {
+    let shared = Arc::clone(&state.0);
+    tokio::task::spawn_blocking(move || {
+        let mut guard = match shared.lock() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        match guard.as_mut() {
+            Some(console) => micropython::exec(console, &code).map_err(|e| e.to_string()),
+            None => Err("Not connected to a board yet.".to_string()),
+        }
+    })
+    .await
+    .map_err(|e| format!("the script stopped unexpectedly: {e}"))?
+}
+
+/// Put a file on the board's filesystem, then check what landed.
+///
+/// Saving as `main.py` is how a script gets to run on boot, which is the whole
+/// point of putting it on the board rather than running it from here.
+#[tauri::command]
+async fn console_upload(
+    app: AppHandle,
+    state: tauri::State<'_, ConsoleState>,
+    path: String,
+    contents: String,
+) -> Result<micropython::Upload, String> {
+    let shared = Arc::clone(&state.0);
+    tokio::task::spawn_blocking(move || {
+        let mut guard = match shared.lock() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        let console = guard
+            .as_mut()
+            .ok_or_else(|| "Not connected to a board yet.".to_string())?;
+
+        let data = contents.as_bytes();
+        let total = data.len();
+        micropython::upload(console, &path, data, |sent| {
+            let _ = app.emit(
+                "upload",
+                serde_json::json!({ "sentBytes": sent, "totalBytes": total }),
+            );
+        })
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| format!("the upload stopped unexpectedly: {e}"))?
+}
+
 /// Identify the chip on a port without writing anything.
 ///
 /// This is what lets the catalogue filter by what is actually connected rather
 /// than by what the user believes they plugged in.
 #[tauri::command]
-async fn detect_device(port: String) -> Result<Target, String> {
+async fn detect_device(
+    state: tauri::State<'_, ConsoleState>,
+    port: String,
+) -> Result<Target, String> {
+    // Identifying drives the ROM bootloader, which needs the port to itself.
+    release_port(&state, &port);
+
     let identity = tokio::task::spawn_blocking({
         let port = port.clone();
         move || firmforge_flash::esp::detect(&port)
@@ -157,6 +352,7 @@ async fn detect_device(port: String) -> Result<Target, String> {
 #[tauri::command]
 async fn run_install(
     app: AppHandle,
+    state: tauri::State<'_, ConsoleState>,
     discovered: DiscoveredManifest,
     build_index: usize,
     demo: bool,
@@ -179,6 +375,14 @@ async fn run_install(
                 message: message.clone(),
             });
             return Err(message);
+        }
+        // A port belongs to one program at a time. Taking it from the console
+        // here turns what would be an opaque "access denied" into something
+        // that just works, and says so.
+        if release_port(&state, &port) {
+            emit(flash::FlashEvent::Log {
+                line: format!("Closed the terminal on {port} so it can be flashed."),
+            });
         }
         Some(port)
     };
@@ -214,6 +418,7 @@ async fn run_install(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(ConsoleState::default())
         .invoke_handler(tauri::generate_handler![
             list_ports,
             demo_device,
@@ -227,6 +432,14 @@ pub fn run() {
             load_builtin_sources,
             prepare_install,
             detect_device,
+            console_open,
+            console_close,
+            console_port,
+            console_send,
+            console_control,
+            console_probe,
+            console_run,
+            console_upload,
             run_install
         ])
         .run(tauri::generate_context!())

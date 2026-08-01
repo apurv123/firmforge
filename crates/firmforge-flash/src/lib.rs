@@ -17,12 +17,18 @@ pub mod bridge;
 pub mod transport;
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
+pub mod console;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub mod esp;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+pub mod micropython;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub mod serial;
 
 pub use bridge::{identify_bridge, BridgeChip};
 pub use transport::{Transport, TransportError, TransportKind};
 
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+pub use console::Console;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub use esp::{detect, write_parts, WriteEvent};
